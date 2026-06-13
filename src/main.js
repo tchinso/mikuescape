@@ -1,6 +1,12 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import {
+  FANART_FLOOR,
+  FANART_SPEED_MULTIPLIER,
+  FANART_START_POSITION,
+  createFanartSurvival,
+} from "./minigames/fanartSurvival.js";
 
 const MODEL_DEFS = [
   {
@@ -119,12 +125,10 @@ const MAX_TRAIL = 720;
 const START_POSITION = new THREE.Vector3(0, 0, ROOM_HALF - 4);
 const EXIT_POSITION = new THREE.Vector3(0, 0, -ROOM_HALF + 0.35);
 const ROOFTOP_FLOOR = 13;
-const FANART_FLOOR = 12;
 const STANDARD_TOP_FLOOR = 12;
 const ROOFTOP_STAGE_NAME = "옥상 스테이지";
 const ROOFTOP_AUDIO_URL = new URL("../assets/rhythm/gunpowder-audio.mp3", import.meta.url).href;
 const ROOFTOP_CHART_URL = new URL("../assets/rhythm/gunpowder-chart.json", import.meta.url).href;
-const FANART_AUDIO_URL = new URL("../assets/musics/fanarts.mp3", import.meta.url).href;
 const RHYTHM_LANE_KEYS = ["Z", "X", "N", "M"];
 const RHYTHM_LANE_CODES = new Map([
   ["KeyZ", 0],
@@ -145,44 +149,6 @@ const RHYTHM_JUDGES = {
   Bad: { window: RHYTHM_MISS_WINDOW, life: -4 },
   Miss: { window: Infinity, life: -6 },
 };
-const FANART_START_POSITION = new THREE.Vector3(0, 0, 0);
-const FANART_START_RADIUS = 5.2;
-const FANART_MAX_HEALTH = 100;
-const FANART_HEALTH_DRAIN_PER_SECOND = FANART_MAX_HEALTH / 6;
-const FANART_HEAL_AMOUNT = 15;
-const FANART_SPEED_MULTIPLIER = 5;
-const FANART_PICKUP_RADIUS = 2.25;
-const FANART_INITIAL_MEDICINE_COUNT = 10;
-const FANART_ACTIVE_MEDICINE_LIMIT = 18;
-const FANART_SPAWN_INTERVAL = 0.7;
-const FANART_MEDICINE_MIN_SPACING = 8.5;
-const FANART_MEDICINE_PLAYER_SAFE_RADIUS = 7.5;
-const FANART_MEDICINE_SPAWNS = [
-  new THREE.Vector3(-33, 0, -34),
-  new THREE.Vector3(-17, 0, -36),
-  new THREE.Vector3(0, 0, -34),
-  new THREE.Vector3(18, 0, -35),
-  new THREE.Vector3(34, 0, -31),
-  new THREE.Vector3(-36, 0, -18),
-  new THREE.Vector3(-20, 0, -20),
-  new THREE.Vector3(12, 0, -22),
-  new THREE.Vector3(31, 0, -17),
-  new THREE.Vector3(-35, 0, 1),
-  new THREE.Vector3(-14, 0, 3),
-  new THREE.Vector3(14, 0, 1),
-  new THREE.Vector3(35, 0, 4),
-  new THREE.Vector3(-31, 0, 18),
-  new THREE.Vector3(-8, 0, 19),
-  new THREE.Vector3(11, 0, 18),
-  new THREE.Vector3(31, 0, 21),
-  new THREE.Vector3(-34, 0, 34),
-  new THREE.Vector3(-17, 0, 31),
-  new THREE.Vector3(2, 0, 34),
-  new THREE.Vector3(20, 0, 32),
-  new THREE.Vector3(35, 0, 30),
-  new THREE.Vector3(-25, 0, -4),
-  new THREE.Vector3(25, 0, -2),
-];
 
 const FLOOR_THEMES = [
   { floor: 13, label: ROOFTOP_STAGE_NAME, floorColor: "#203341", grid: "#38bdf8", wall: "#142431" },
@@ -287,7 +253,6 @@ const room = createRoom();
 scene.add(room.group);
 let rhythmStage = null;
 let audience = null;
-let fanartStage = null;
 
 const loader = new GLTFLoader();
 const loadedScenes = new Map();
@@ -303,8 +268,6 @@ const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const clock = new THREE.Clock();
 const rhythmAudio = new Audio(ROOFTOP_AUDIO_URL);
 rhythmAudio.preload = "auto";
-const fanartAudio = new Audio(FANART_AUDIO_URL);
-fanartAudio.preload = "auto";
 
 let player = null;
 let currentRecruit = null;
@@ -330,13 +293,25 @@ const rhythmState = {
   counts: { Perfect: 0, Great: 0, Good: 0, Bad: 0, Miss: 0 },
 };
 
-const fanartState = {
-  status: "ready",
-  health: FANART_MAX_HEALTH,
-  spawnTimer: 0,
-  spawnCursor: 0,
-  collected: 0,
-};
+const fanartGame = createFanartSurvival({
+  roomHalf: ROOM_HALF,
+  camera,
+  dom,
+  createTextSprite,
+  getCurrentFloor: () => currentFloor,
+  getPlayer: () => player,
+  getCurrentRecruit: () => currentRecruit,
+  isEscapeComplete: () => escapeComplete,
+  clearPointerTarget: () => {
+    pointerTargetActive.value = false;
+  },
+  resetTrail,
+  showMessage,
+  showPopup,
+  updateHud,
+  openExit,
+  recruitCurrent,
+});
 
 init().catch(handleFatalError);
 
@@ -350,8 +325,7 @@ async function init() {
   scene.add(rhythmStage.group);
   audience = createAudience();
   scene.add(audience.group);
-  fanartStage = createFanartStage();
-  scene.add(fanartStage.group);
+  scene.add(fanartGame.createStage().group);
 
   await loadModels();
 
@@ -363,7 +337,7 @@ async function init() {
   resetTrail();
 
   resetRooftopPerformance();
-  resetFanartSurvival();
+  fanartGame.reset();
   applyFloorTheme();
 
   if (developerShortcutFloor !== null) {
@@ -398,7 +372,7 @@ function bindEvents() {
       return;
     }
 
-    if (handleFanartKeyDown(event)) {
+    if (fanartGame.handleKeyDown(event)) {
       return;
     }
 
@@ -433,9 +407,6 @@ function bindEvents() {
   });
   rhythmAudio.addEventListener("ended", () => {
     completeRooftopPerformance();
-  });
-  fanartAudio.addEventListener("ended", () => {
-    completeFanartSurvival();
   });
 }
 
@@ -965,104 +936,12 @@ function createAudience() {
   return { group, members };
 }
 
-function createFanartStage() {
-  const group = new THREE.Group();
-  group.name = "floor-12-fanart-survival";
-
-  const padMaterial = new THREE.MeshBasicMaterial({
-    color: "#22d3ee",
-    transparent: true,
-    opacity: 0.16,
-    depthWrite: false,
-  });
-  const pad = new THREE.Mesh(new THREE.CircleGeometry(FANART_START_RADIUS, 96), padMaterial);
-  pad.rotation.x = -Math.PI / 2;
-  pad.position.y = 0.045;
-  group.add(pad);
-
-  const ringMaterial = new THREE.MeshBasicMaterial({
-    color: "#a7f3d0",
-    transparent: true,
-    opacity: 0.74,
-  });
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(FANART_START_RADIUS, 0.08, 12, 128), ringMaterial);
-  ring.rotation.x = -Math.PI / 2;
-  ring.position.y = 0.09;
-  group.add(ring);
-
-  const label = createTextSprite("E START", "#22d3ee", 0.92);
-  label.position.set(0, 1.3, 0);
-  label.scale.set(2.1, 0.54, 1);
-  group.add(label);
-
-  const plusMaterial = new THREE.MeshStandardMaterial({
-    color: "#f8fafc",
-    roughness: 0.28,
-    metalness: 0.08,
-    emissive: "#22c55e",
-    emissiveIntensity: 0.75,
-  });
-  const medicineRingMaterial = new THREE.MeshBasicMaterial({
-    color: "#86efac",
-    transparent: true,
-    opacity: 0.62,
-  });
-  const medicineItems = Array.from({ length: FANART_ACTIVE_MEDICINE_LIMIT }, () => {
-    const medicine = createFanartMedicine(plusMaterial, medicineRingMaterial);
-    group.add(medicine.group);
-    return medicine;
-  });
-
-  group.visible = false;
-  return {
-    group,
-    pad,
-    padMaterial,
-    ring,
-    ringMaterial,
-    label,
-    medicineItems,
-  };
-}
-
-function createFanartMedicine(plusMaterial, ringMaterial) {
-  const group = new THREE.Group();
-  group.name = "healing-medicine-plus";
-  group.visible = false;
-
-  const horizontal = new THREE.Mesh(new THREE.BoxGeometry(1.22, 0.16, 0.34), plusMaterial);
-  horizontal.position.y = 0.44;
-  horizontal.castShadow = true;
-  group.add(horizontal);
-
-  const vertical = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.16, 1.22), plusMaterial);
-  vertical.position.y = 0.44;
-  vertical.castShadow = true;
-  group.add(vertical);
-
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.15, 0.035, 10, 72), ringMaterial);
-  ring.rotation.x = -Math.PI / 2;
-  ring.position.y = 0.08;
-  group.add(ring);
-
-  const light = new THREE.PointLight("#86efac", 2.2, 5.5, 1.6);
-  light.position.y = 0.75;
-  group.add(light);
-
-  return {
-    group,
-    ring,
-    active: false,
-    phase: Math.random() * Math.PI * 2,
-  };
-}
-
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.033);
   const elapsed = clock.elapsedTime;
 
   updateRooftopStage(dt, elapsed);
-  updateFanartSurvival(dt, elapsed);
+  fanartGame.update(dt, elapsed);
 
   if (player && !escapeComplete) {
     updatePlayer(dt);
@@ -1114,7 +993,7 @@ function updatePlayer(dt) {
   }
 
   const baseSpeed = keys.has("shift") ? 11 : 6.8;
-  const speed = baseSpeed * (isFanartSurvivalPlaying() ? FANART_SPEED_MULTIPLIER : 1);
+  const speed = baseSpeed * (fanartGame.isPlaying() ? FANART_SPEED_MULTIPLIER : 1);
   player.group.position.addScaledVector(direction, speed * dt);
   clampToRoom(player.group.position, ROOM_HALF);
 }
@@ -1228,7 +1107,7 @@ function checkRecruitCollision() {
     return;
   }
 
-  if (currentFloor === FANART_FLOOR && !isFanartSurvivalCleared()) {
+  if (currentFloor === FANART_FLOOR && !fanartGame.isCleared()) {
     return;
   }
 
@@ -1243,7 +1122,7 @@ function recruitCurrent() {
     return;
   }
 
-  if (currentFloor === FANART_FLOOR && !isFanartSurvivalCleared()) {
+  if (currentFloor === FANART_FLOOR && !fanartGame.isCleared()) {
     showMessage("치료약 생존전을 클리어해야 동료가 합류합니다.", 1800);
     return;
   }
@@ -1304,7 +1183,7 @@ function advanceDebugStep() {
     return;
   }
 
-  if (currentFloor === FANART_FLOOR && !isFanartSurvivalCleared()) {
+  if (currentFloor === FANART_FLOOR && !fanartGame.isCleared()) {
     showMessage("12층 치료약 생존전을 먼저 클리어해야 합니다.", 1800);
     return;
   }
@@ -1335,7 +1214,7 @@ function completeDoorTransition() {
   }
 
   if (leavingFloor === FANART_FLOOR) {
-    resetFanartSurvival();
+    fanartGame.reset();
   }
 
   currentFloor -= 1;
@@ -1346,10 +1225,10 @@ function completeDoorTransition() {
   showMessage(getFloorDisplayName(currentFloor));
 
   if (currentFloor === FANART_FLOOR) {
-    resetFanartSurvival();
+    fanartGame.reset();
     window.setTimeout(() => {
       if (!escapeComplete && currentFloor === FANART_FLOOR) {
-        showFanartIntroPopup();
+        fanartGame.showIntroPopup();
       }
     }, 120);
   }
@@ -1375,7 +1254,7 @@ function applyFloorTheme() {
   room.floorSign.scale.set(currentFloor === ROOFTOP_FLOOR ? 3.25 : 2.2, currentFloor === ROOFTOP_FLOOR ? 0.78 : 0.7, 1);
   newSign.material.dispose();
   updateRooftopVisibility();
-  updateFanartVisibility();
+  fanartGame.updateVisibility();
 }
 
 function updateHud() {
@@ -1386,8 +1265,8 @@ function updateHud() {
     dom.nextValue.textContent = "탈출 완료";
   } else if (currentFloor === ROOFTOP_FLOOR) {
     dom.nextValue.textContent = rooftopGoalText();
-  } else if (currentFloor === FANART_FLOOR && !isFanartSurvivalCleared()) {
-    dom.nextValue.textContent = fanartGoalText();
+  } else if (currentFloor === FANART_FLOOR && !fanartGame.isCleared()) {
+    dom.nextValue.textContent = fanartGame.goalText();
   } else if (currentRecruit) {
     dom.nextValue.textContent = currentRecruit.def.name;
   } else if (exitOpen && currentFloor === 1) {
@@ -1515,7 +1394,7 @@ function setupDeveloperShortcutFloor(floor) {
   spawnRecruit();
 
   if (floor === FANART_FLOOR) {
-    showFanartIntroPopup();
+    fanartGame.showIntroPopup();
   }
 
   showMessage(`${floor}F 개발자 테스트`);
@@ -1538,14 +1417,6 @@ function showRooftopIntroPopup() {
   showPopup(
     ROOFTOP_STAGE_NAME,
     "미쿠는 공연으로 관객들을 만족시켜야 이 층을 탈출할 수 있습니다. 판정 라인 아래에서 Z를 누르면 공연이 시작됩니다.",
-    "확인",
-  );
-}
-
-function showFanartIntroPopup() {
-  showPopup(
-    "12층 치료약 생존전",
-    "치료약을 모으며 FanArt가 끝날 때까지 미쿠를 살려야 합니다. 모든 치료가 끝나기 전에는 12층을 탈출할 수 없습니다. 가운데 원 안으로 들어가 E를 누르면 시작되고, 진행 중에는 미쿠의 이동속도가 5배가 됩니다. 플러스 치료약은 하나당 체력을 15% 회복합니다.",
     "확인",
   );
 }
@@ -1573,19 +1444,6 @@ function rooftopGoalText() {
   return "공연 준비";
 }
 
-function fanartGoalText() {
-  if (exitOpen || fanartState.status === "cleared") {
-    return "문으로 이동";
-  }
-  if (fanartState.status === "playing") {
-    return `치료약 생존 중 ${Math.ceil(fanartState.health)}%`;
-  }
-  if (fanartState.status === "failed") {
-    return "처음부터 재도전";
-  }
-  return "중앙 원에서 E";
-}
-
 function updateRooftopVisibility() {
   if (!rhythmStage || !audience) {
     return;
@@ -1595,429 +1453,6 @@ function updateRooftopVisibility() {
   rhythmStage.group.visible = visible;
   audience.group.visible = visible;
   dom.rhythmHud.classList.toggle("hidden", !visible);
-}
-
-function updateFanartVisibility() {
-  if (!fanartStage) {
-    return;
-  }
-
-  const visible = currentFloor === FANART_FLOOR
-    && !escapeComplete
-    && fanartState.status !== "cleared";
-  fanartStage.group.visible = visible;
-  dom.survivalHud.classList.toggle("hidden", !visible);
-}
-
-function resetFanartSurvival(options = {}) {
-  fanartAudio.pause();
-  try {
-    fanartAudio.currentTime = 0;
-  } catch {
-    // Metadata may not be available yet on the first reset.
-  }
-
-  fanartState.status = "ready";
-  fanartState.health = FANART_MAX_HEALTH;
-  fanartState.spawnTimer = 0;
-  fanartState.spawnCursor = 0;
-  fanartState.collected = 0;
-  hideFanartMedicines();
-
-  if (options.placePlayer && player) {
-    player.group.position.copy(FANART_START_POSITION);
-    player.group.rotation.y = Math.PI;
-    player.previousPosition.copy(player.group.position);
-    pointerTargetActive.value = false;
-    resetTrail();
-  }
-
-  updateFanartVisibility();
-  updateSurvivalHud();
-  updateHud();
-}
-
-function isFanartSurvivalPlaying() {
-  return currentFloor === FANART_FLOOR && fanartState.status === "playing";
-}
-
-function isFanartSurvivalCleared() {
-  return fanartState.status === "cleared";
-}
-
-function isPlayerAtFanartStart() {
-  if (!player) {
-    return false;
-  }
-
-  const position = player.group.position;
-  return position.distanceTo(FANART_START_POSITION) <= FANART_START_RADIUS;
-}
-
-function handleFanartKeyDown(event) {
-  if (currentFloor !== FANART_FLOOR) {
-    return false;
-  }
-
-  const isStartKey = event.code === "KeyE" || event.key.toLowerCase() === "e";
-  if (!isStartKey) {
-    return false;
-  }
-
-  event.preventDefault();
-  if (event.repeat) {
-    return true;
-  }
-
-  if (fanartState.status === "ready" || fanartState.status === "failed") {
-    if (isPlayerAtFanartStart()) {
-      startFanartSurvival();
-    } else {
-      showMessage("가운데 원 안으로 들어가 E를 눌러주세요.", 1800);
-    }
-  }
-
-  return true;
-}
-
-async function startFanartSurvival() {
-  if (!player || (fanartState.status !== "ready" && fanartState.status !== "failed")) {
-    return;
-  }
-
-  fanartState.status = "ready";
-  fanartState.health = FANART_MAX_HEALTH;
-  fanartState.spawnTimer = FANART_SPAWN_INTERVAL;
-  fanartState.spawnCursor = 0;
-  fanartState.collected = 0;
-  hideFanartMedicines();
-  pointerTargetActive.value = false;
-  player.previousPosition.copy(player.group.position);
-  resetTrail();
-
-  try {
-    fanartAudio.currentTime = 0;
-  } catch {
-    // The browser can still begin playback from the start once metadata loads.
-  }
-
-  try {
-    await fanartAudio.play();
-    fanartState.status = "playing";
-    spawnInitialFanartMedicines();
-    updateHud();
-    updateSurvivalHud();
-    showMessage("치료약 생존전 시작", 1000);
-  } catch (error) {
-    console.warn("FanArt playback was blocked.", error);
-    fanartState.status = "ready";
-    hideFanartMedicines();
-    updateHud();
-    updateSurvivalHud();
-    showPopup("오디오 재생 확인", "브라우저가 음악 재생을 막았습니다. 화면을 클릭한 뒤 가운데 원 안에서 E를 다시 눌러주세요.", "확인");
-  }
-}
-
-function updateFanartSurvival(dt, elapsed) {
-  updateFanartVisibility();
-  if (currentFloor !== FANART_FLOOR || escapeComplete) {
-    return;
-  }
-
-  updateFanartStageMaterials(dt, elapsed);
-
-  if (fanartState.status === "playing") {
-    fanartState.health = THREE.MathUtils.clamp(
-      fanartState.health - FANART_HEALTH_DRAIN_PER_SECOND * dt,
-      0,
-      FANART_MAX_HEALTH,
-    );
-
-    checkFanartMedicinePickups();
-
-    fanartState.spawnTimer -= dt;
-    while (fanartState.spawnTimer <= 0) {
-      spawnFanartMedicine();
-      fanartState.spawnTimer += FANART_SPAWN_INTERVAL;
-    }
-
-    if (fanartState.health <= 0) {
-      failFanartSurvival();
-      return;
-    }
-  }
-
-  updateSurvivalHud();
-}
-
-function updateFanartStageMaterials(dt, elapsed) {
-  const atStart = fanartState.status !== "playing" && isPlayerAtFanartStart();
-  fanartStage.padMaterial.opacity = atStart
-    ? 0.26 + Math.sin(elapsed * 6.2) * 0.06
-    : 0.14 + Math.sin(elapsed * 2.2) * 0.025;
-  fanartStage.ringMaterial.opacity = atStart
-    ? 0.86 + Math.sin(elapsed * 7.4) * 0.1
-    : 0.58 + Math.sin(elapsed * 2.8) * 0.06;
-  fanartStage.ring.rotation.z += dt * (fanartState.status === "playing" ? 1.2 : 0.45);
-  fanartStage.label.visible = fanartState.status !== "playing";
-
-  fanartStage.medicineItems.forEach((item) => {
-    if (!item.active) {
-      return;
-    }
-    item.group.position.y = Math.sin(elapsed * 3.5 + item.phase) * 0.08;
-    item.group.rotation.y += dt * 2.3;
-    item.ring.material.opacity = 0.48 + Math.sin(elapsed * 5 + item.phase) * 0.16;
-  });
-}
-
-function spawnInitialFanartMedicines() {
-  for (let i = 0; i < FANART_INITIAL_MEDICINE_COUNT; i += 1) {
-    spawnFanartMedicine();
-  }
-}
-
-function spawnFanartMedicine() {
-  if (!fanartStage) {
-    return false;
-  }
-
-  if (countActiveFanartMedicines() >= FANART_ACTIVE_MEDICINE_LIMIT) {
-    return false;
-  }
-
-  const inactive = fanartStage.medicineItems.find((item) => !item.active);
-  if (!inactive) {
-    return false;
-  }
-
-  const point = getNextFanartMedicinePoint();
-  inactive.group.position.copy(point);
-  inactive.group.position.y = 0;
-  inactive.group.rotation.y = Math.random() * Math.PI * 2;
-  inactive.active = true;
-  inactive.group.visible = true;
-  return true;
-}
-
-function getNextFanartMedicinePoint() {
-  for (let attempt = 0; attempt < 64; attempt += 1) {
-    const point = makeFanartRandomSpawnPoint();
-    if (isFanartMedicinePointUsable(point, FANART_MEDICINE_MIN_SPACING, true)) {
-      return point;
-    }
-  }
-
-  for (let attempt = 0; attempt < 64; attempt += 1) {
-    const point = makeFanartRandomSpawnPoint();
-    if (isFanartMedicinePointUsable(point, FANART_MEDICINE_MIN_SPACING, false)) {
-      return point;
-    }
-  }
-
-  for (let attempt = 0; attempt < FANART_MEDICINE_SPAWNS.length; attempt += 1) {
-    const index = fanartState.spawnCursor % FANART_MEDICINE_SPAWNS.length;
-    fanartState.spawnCursor += 1;
-    const point = FANART_MEDICINE_SPAWNS[index].clone();
-    if (isFanartMedicinePointUsable(point, 5.5, false)) {
-      return point;
-    }
-  }
-
-  return getFarthestFanartMedicinePoint();
-}
-
-function makeFanartRandomSpawnPoint() {
-  const origin = player?.group.position ?? FANART_START_POSITION;
-  const angle = Math.random() * Math.PI * 2;
-  const radius = THREE.MathUtils.randFloat(10, 28);
-  const point = new THREE.Vector3(
-    origin.x + Math.cos(angle) * radius,
-    0,
-    origin.z + Math.sin(angle) * radius,
-  );
-  point.x = THREE.MathUtils.clamp(point.x, -ROOM_HALF + 3, ROOM_HALF - 3);
-  point.z = THREE.MathUtils.clamp(point.z, -ROOM_HALF + 3, ROOM_HALF - 3);
-  return point;
-}
-
-function isFanartMedicinePointUsable(point, minSpacing, requireVisible) {
-  if (player && flatDistance(point, player.group.position) < FANART_MEDICINE_PLAYER_SAFE_RADIUS) {
-    return false;
-  }
-
-  if (requireVisible && !isPointInCameraView(point)) {
-    return false;
-  }
-
-  return !fanartStage.medicineItems.some((item) => (
-    item.active && flatDistance(item.group.position, point) < minSpacing
-  ));
-}
-
-function getFarthestFanartMedicinePoint() {
-  let best = FANART_MEDICINE_SPAWNS[0];
-  let bestScore = -Infinity;
-
-  FANART_MEDICINE_SPAWNS.forEach((point) => {
-    const activeDistances = fanartStage.medicineItems
-      .filter((item) => item.active)
-      .map((item) => flatDistance(item.group.position, point));
-    const nearestMedicine = activeDistances.length > 0 ? Math.min(...activeDistances) : 20;
-    const playerDistance = player ? flatDistance(point, player.group.position) : 20;
-    const visibleBonus = isPointInCameraView(point) ? 6 : 0;
-    const score = nearestMedicine + Math.min(playerDistance, 20) * 0.35 + visibleBonus;
-    if (playerDistance >= FANART_MEDICINE_PLAYER_SAFE_RADIUS && score > bestScore) {
-      best = point;
-      bestScore = score;
-    }
-  });
-
-  return best.clone();
-}
-
-function isPointInCameraView(point) {
-  const projected = point.clone();
-  projected.y = 0.4;
-  projected.project(camera);
-  return projected.z >= -1
-    && projected.z <= 1
-    && projected.x >= -0.9
-    && projected.x <= 0.9
-    && projected.y >= -0.92
-    && projected.y <= 0.82;
-}
-
-function countActiveFanartMedicines() {
-  if (!fanartStage) {
-    return 0;
-  }
-
-  return fanartStage.medicineItems.reduce((total, item) => total + (item.active ? 1 : 0), 0);
-}
-
-function checkFanartMedicinePickups() {
-  if (!player || !fanartStage) {
-    return;
-  }
-
-  fanartStage.medicineItems.forEach((item) => {
-    if (!item.active || flatDistance(item.group.position, player.group.position) > FANART_PICKUP_RADIUS) {
-      return;
-    }
-
-    item.active = false;
-    item.group.visible = false;
-    fanartState.collected += 1;
-    fanartState.health = THREE.MathUtils.clamp(
-      fanartState.health + FANART_HEAL_AMOUNT,
-      0,
-      FANART_MAX_HEALTH,
-    );
-  });
-}
-
-function hideFanartMedicines() {
-  if (!fanartStage) {
-    return;
-  }
-
-  fanartStage.medicineItems.forEach((item) => {
-    item.active = false;
-    item.group.visible = false;
-  });
-}
-
-function failFanartSurvival() {
-  if (fanartState.status !== "playing") {
-    return;
-  }
-
-  fanartState.status = "failed";
-  fanartState.health = 0;
-  fanartAudio.pause();
-  hideFanartMedicines();
-  updateHud();
-  updateSurvivalHud();
-  showPopup(
-    "12층 생존 실패",
-    "미쿠의 체력이 0이 되었습니다. 치료약 생존전을 처음부터 다시 시작해야 합니다.",
-    "처음부터",
-    () => {
-      resetFanartSurvival({ placePlayer: true });
-      showMessage("중앙 원에서 E로 다시 시작", 1600);
-    },
-  );
-}
-
-function completeFanartSurvival() {
-  if (currentFloor !== FANART_FLOOR || fanartState.status !== "playing") {
-    return;
-  }
-
-  if (fanartState.health <= 0) {
-    failFanartSurvival();
-    return;
-  }
-
-  fanartState.status = "cleared";
-  hideFanartMedicines();
-  updateSurvivalHud();
-  updateHud();
-
-  const recruitName = currentRecruit?.def.name ?? "12층 동료";
-  if (currentRecruit) {
-    recruitCurrent();
-  } else {
-    openExit();
-  }
-
-  showPopup(
-    "치료약 수집 성공",
-    `FanArt가 끝날 때까지 버텼습니다. ${recruitName}가 동료로 합류했고 12층 문이 열렸습니다.`,
-    "확인",
-  );
-}
-
-function updateSurvivalHud() {
-  if (!dom.survivalHud) {
-    return;
-  }
-
-  const health = Math.max(0, fanartState.health);
-  dom.survivalSong.textContent = "FanArt · 치료약 생존";
-  dom.survivalStatus.textContent = fanartGoalText();
-  dom.survivalHealthText.textContent = `${Math.ceil(health)} / ${FANART_MAX_HEALTH}`;
-  dom.survivalHealthFill.style.width = `${health}%`;
-  dom.survivalHealthFill.classList.toggle("danger", health <= 24);
-  dom.survivalMeds.textContent = `${fanartState.collected}개`;
-  dom.survivalTime.textContent = formatSongTime(getFanartTimeRemaining());
-  dom.survivalHint.textContent = fanartState.status === "playing" ? "플러스 밟기" : "중앙 원 E";
-}
-
-function getFanartTimeRemaining() {
-  if (!Number.isFinite(fanartAudio.duration) || fanartAudio.duration <= 0) {
-    return null;
-  }
-
-  return Math.max(0, fanartAudio.duration - fanartAudio.currentTime);
-}
-
-function formatSongTime(seconds) {
-  if (seconds === null) {
-    return "--:--";
-  }
-
-  const safeSeconds = Math.max(0, Math.ceil(seconds));
-  const minutes = Math.floor(safeSeconds / 60);
-  const remainder = safeSeconds % 60;
-  return `${minutes}:${remainder.toString().padStart(2, "0")}`;
-}
-
-function flatDistance(a, b) {
-  const dx = a.x - b.x;
-  const dz = a.z - b.z;
-  return Math.hypot(dx, dz);
 }
 
 function makeRooftopNotes() {
@@ -2459,7 +1894,7 @@ function resetPrototype() {
   applyFloorTheme();
   renderRoster();
   resetRooftopPerformance();
-  resetFanartSurvival();
+  fanartGame.reset();
 
   if (developerShortcutFloor !== null) {
     setupDeveloperShortcutFloor(developerShortcutFloor);
