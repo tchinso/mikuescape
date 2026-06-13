@@ -14,6 +14,7 @@
             this.previous = new THREE.Vector3();
             this.tmpDir = new THREE.Vector3();
             this.keyState = { forward: false, backward: false, left: false, right: false };
+            this.virtualMove = { x: 0, y: 0, active: false };
             this.fallbackActive = false;
             this.isGrounded = false;
             this.isRunning = false;
@@ -130,6 +131,12 @@
 
         setFallbackActive(active) {
             this.fallbackActive = active;
+        }
+
+        setVirtualMove(x, y) {
+            this.virtualMove.x = ns.clamp(x, -1, 1);
+            this.virtualMove.y = ns.clamp(y, -1, 1);
+            this.virtualMove.active = Math.abs(this.virtualMove.x) > 0.04 || Math.abs(this.virtualMove.y) > 0.04;
         }
 
         isActive() {
@@ -251,7 +258,11 @@
         }
 
         updateMovementInput(dt) {
-            const moving = this.keyState.forward || this.keyState.backward || this.keyState.left || this.keyState.right;
+            const keyForward = Number(this.keyState.forward) - Number(this.keyState.backward);
+            const keyRight = Number(this.keyState.right) - Number(this.keyState.left);
+            const forwardAxis = ns.clamp(keyForward + this.virtualMove.y, -1, 1);
+            const rightAxis = ns.clamp(keyRight + this.virtualMove.x, -1, 1);
+            const moving = Math.abs(forwardAxis) > 0.04 || Math.abs(rightAxis) > 0.04;
             const canRun = this.isRunning && moving && !this.state.onBoat;
             let speed = this.state.onBoat ? C.boatSpeed : (canRun ? C.runSpeed : C.speed);
             speed *= this.getSpeedMultiplier();
@@ -266,14 +277,14 @@
                 this.stamina = Math.min(this.getMaxStamina(), this.stamina + C.staminaRegen * dt);
             }
 
-            this.direction.z = Number(this.keyState.forward) - Number(this.keyState.backward);
-            this.direction.x = Number(this.keyState.right) - Number(this.keyState.left);
+            this.direction.z = forwardAxis;
+            this.direction.x = rightAxis;
             this.direction.normalize();
 
-            if (this.keyState.forward || this.keyState.backward) {
+            if (Math.abs(forwardAxis) > 0.04) {
                 this.velocity.z -= this.direction.z * speed * 10 * dt;
             }
-            if (this.keyState.left || this.keyState.right) {
+            if (Math.abs(rightAxis) > 0.04) {
                 this.velocity.x -= this.direction.x * speed * 10 * dt;
             }
         }

@@ -34,9 +34,9 @@
         }
 
         phase() {
-            if (this.elapsed < 180) return 0;
-            if (this.elapsed < 420) return 1;
-            if (this.elapsed < 720) return 2;
+            if (this.elapsed < C.monster.forestPhaseSecond) return 0;
+            if (this.elapsed < C.monster.edgePhaseSecond) return 1;
+            if (this.elapsed < C.monster.worldPhaseSecond) return 2;
             return 3;
         }
 
@@ -68,7 +68,7 @@
         trySpawn() {
             if (this.monsters.length >= C.monster.maxAlive) return;
             const phase = this.phase();
-            const count = this.rng() < this.difficulty() * 0.28 ? 2 : 1;
+            const count = this.rng() < this.difficulty() * 0.08 ? 2 : 1;
             for (let i = 0; i < count && this.monsters.length < C.monster.maxAlive; i++) {
                 const type = this.pickType();
                 const point = this.world.randomMonsterSpawnPoint(this.rng, phase, this.player.camera.position);
@@ -78,25 +78,25 @@
 
         pickType() {
             const d = this.difficulty();
-            if (this.elapsed >= C.monster.bossFirstSecond && this.rng() < 0.035 + d * 0.03) return "boss";
-            if (this.elapsed > 360 && this.rng() < 0.18 + d * 0.12) return "tank";
-            if (this.elapsed > 210 && this.rng() < 0.22 + d * 0.1) return "fast";
+            if (this.elapsed >= C.monster.bossFirstSecond && this.rng() < 0.008 + d * 0.012) return "boss";
+            if (this.elapsed > C.monster.tankFirstSecond && this.rng() < 0.07 + d * 0.06) return "tank";
+            if (this.elapsed > C.monster.fastFirstSecond && this.rng() < 0.1 + d * 0.06) return "fast";
             return "normal";
         }
 
         statsFor(type) {
             const d = this.difficulty();
-            const scale = 1 + d * 1.55;
+            const scale = 1 + d * 0.45;
             if (type === "fast") {
-                return { name: "추격 몬스터", hp: 54 * scale, damage: 7 + d * 8, speed: 18 + d * 3, radius: 3.1, value: Math.floor(70 + d * 110), aggro: 118 };
+                return { name: "추격 몬스터", hp: 46 * scale, damage: 5 + d * 3, speed: 15 + d * 1.2, radius: 3.1, value: Math.floor(70 + d * 70), aggro: 98 };
             }
             if (type === "tank") {
-                return { name: "중장갑 몬스터", hp: 160 * scale, damage: 18 + d * 16, speed: 5.5 + d * 1.2, radius: 5.2, value: Math.floor(150 + d * 230), aggro: 72 };
+                return { name: "중장갑 몬스터", hp: 128 * scale, damage: 12 + d * 7, speed: 4.5 + d * 0.6, radius: 5.2, value: Math.floor(150 + d * 150), aggro: 62 };
             }
             if (type === "boss") {
-                return { name: "보스 몬스터", hp: 520 * scale, damage: 28 + d * 24, speed: 8 + d * 1.5, radius: 8.5, value: Math.floor(900 + d * 1200), aggro: 160 };
+                return { name: "보스 몬스터", hp: 420 * scale, damage: 20 + d * 12, speed: 6 + d * 0.8, radius: 8.5, value: Math.floor(900 + d * 700), aggro: 130 };
             }
-            return { name: "일반 몬스터", hp: 82 * scale, damage: 10 + d * 9, speed: 10 + d * 2.2, radius: 3.8, value: Math.floor(95 + d * 150), aggro: 84 };
+            return { name: "일반 몬스터", hp: 64 * scale, damage: 6 + d * 4, speed: 8 + d * 1, radius: 3.8, value: Math.floor(95 + d * 90), aggro: 72 };
         }
 
         spawn(type, x, z) {

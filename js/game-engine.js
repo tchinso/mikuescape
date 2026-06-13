@@ -31,6 +31,9 @@
             this.dragLook = false;
             this.lookYaw = 0;
             this.lookPitch = 0;
+            this.lastMouseX = null;
+            this.lastMouseY = null;
+            this.touchLook = { x: 0, y: 0, active: false };
         }
 
         init() {
@@ -154,21 +157,45 @@
         setupDragLook() {
             const canvas = this.renderer.domElement;
             canvas.addEventListener("pointerdown", (event) => {
+                if (event.pointerType !== "touch") return;
                 if (!this.gameActive || this.ui.dialogVisible || this.controls.isLocked) return;
                 this.dragLook = true;
                 if (canvas.setPointerCapture) canvas.setPointerCapture(event.pointerId);
             });
 
-            window.addEventListener("pointerup", () => {
-                this.dragLook = false;
+            window.addEventListener("pointerup", (event) => {
+                if (event.pointerType === "touch") this.dragLook = false;
             });
 
             window.addEventListener("pointermove", (event) => {
-                if (!this.dragLook || this.controls.isLocked) return;
-                this.lookYaw -= event.movementX * 0.003;
-                this.lookPitch -= event.movementY * 0.003;
+                if (!this.gameActive || this.ui.dialogVisible || this.controls.isLocked) return;
+                if (event.pointerType === "touch" && !this.dragLook) return;
+
+                let dx = event.movementX || 0;
+                let dy = event.movementY || 0;
+                if (event.pointerType === "mouse") {
+                    if (this.lastMouseX === null || this.lastMouseY === null) {
+                        this.lastMouseX = event.clientX;
+                        this.lastMouseY = event.clientY;
+                        return;
+                    }
+                    dx = event.clientX - this.lastMouseX;
+                    dy = event.clientY - this.lastMouseY;
+                    this.lastMouseX = event.clientX;
+                    this.lastMouseY = event.clientY;
+                }
+
+                this.lookYaw -= dx * 0.003;
+                this.lookPitch -= dy * 0.003;
                 this.lookPitch = ns.clamp(this.lookPitch, -1.05, 0.72);
                 this.camera.rotation.set(this.lookPitch, this.lookYaw, 0, "YXZ");
+            });
+
+            window.addEventListener("pointerleave", (event) => {
+                if (event.pointerType === "mouse") {
+                    this.lastMouseX = null;
+                    this.lastMouseY = null;
+                }
             });
 
             window.addEventListener("keydown", (event) => {
@@ -186,6 +213,7 @@
             const canvas = this.renderer.domElement;
             canvas.addEventListener("pointerdown", (event) => {
                 if (event.button !== 0) return;
+                if (event.pointerType === "touch") return;
                 if (!this.gameActive || this.ui.dialogVisible) return;
                 this.player.shoot(this.monsters);
             });
@@ -196,6 +224,103 @@
                 event.preventDefault();
                 this.player.shoot(this.monsters);
             });
+
+            const fireBtn = document.getElementById("touch-fire");
+            if (fireBtn) {
+                fireBtn.addEventListener("pointerdown", (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (!this.gameActive || this.ui.dialogVisible) return;
+                    this.player.shoot(this.monsters);
+                });
+            }
+
+            this.setupTouchJoysticks();
+        }
+
+        setupTouchJoysticks() {
+            const moveJoy = document.getElementById("move-joystick");
+            const lookJoy = document.getElementById("look-joystick");
+            if (!moveJoy || !lookJoy) return;
+
+            this.bindJoystick(moveJoy, (x, y) => {
+                this.player.setVirtualMove(x, y);
+            }, () => {
+                this.player.setVirtualMove(0, 0);
+            });
+
+            this.bindJoystick(lookJoy, (x, y) => {
+                this.touchLook.x = x;
+                this.touchLook.y = y;
+                this.touchLook.active = Math.abs(x) > 0.04 || Math.abs(y) > 0.04;
+            }, () => {
+                this.touchLook.x = 0;
+                this.touchLook.y = 0;
+                this.touchLook.active = false;
+            });
+        }
+
+        bindJoystick(root, onMove, onEnd) {
+            const knob = root.querySelector(".joystick-knob");
+            const state = { pointerId: null };
+            const radius = 42;
+
+            const reset = () => {
+                state.pointerId = null;
+                if (knob) knob.style.transform = "translate(-50%, -50%)";
+                onEnd();
+            };
+
+            const update = (event) => {
+                const rect = root.getBoundingClientRect();
+                const cx = rect.left + rect.width / 2;
+                const cy = rect.top + rect.height / 2;
+                const rawX = event.clientX - cx;
+                const rawY = event.clientY - cy;
+                const len = Math.max(1, Math.sqrt(rawX * rawX + rawY * rawY));
+                const limited = Math.min(radius, len);
+                const knobX = rawX / len * limited;
+                const knobY = rawY / len * limited;
+                if (knob) knob.style.transform = `translate(calc(-50% + ${knobX}px), calc(-50% + ${knobY}px))`;
+                onMove(knobX / radius, -knobY / radius);
+            };
+
+            root.addEventListener("pointerdown", (event) => {
+                if (!this.gameActive || this.ui.dialogVisible) return;
+                event.preventDefault();
+                event.stopPropagation();
+                state.pointerId = event.pointerId;
+                if (root.setPointerCapture) root.setPointerCapture(event.pointerId);
+                update(event);
+            });
+
+            root.addEventListener("pointermove", (event) => {
+                if (state.pointerId !== event.pointerId) return;
+                event.preventDefault();
+                event.stopPropagation();
+                update(event);
+            });
+
+            root.addEventListener("pointerup", (event) => {
+                if (state.pointerId !== event.pointerId) return;
+                event.preventDefault();
+                event.stopPropagation();
+                reset();
+            });
+
+            root.addEventListener("pointercancel", (event) => {
+                if (state.pointerId !== event.pointerId) return;
+                reset();
+            });
+        }
+
+        updateTouchLook(dt) {
+            if (!this.touchLook.active || this.controls.isLocked) return;
+            const turnSpeed = 2.35;
+            this.lookYaw -= this.touchLook.x * turnSpeed * dt;
+            this.lookPitch += this.touchLook.y * turnSpeed * dt;
+            this.lookPitch = ns.clamp(this.lookPitch, -1.05, 0.72);
+            this.camera.rotation.set(this.lookPitch, this.lookYaw, 0, "YXZ");
         }
 
         setupLights() {
@@ -267,10 +392,15 @@
             this.ui.update(dt);
 
             if (this.gameActive) {
+                this.updateTouchLook(dt);
                 this.player.update(dt);
                 this.monsters.update(dt);
             } else {
                 this.player.updateHud();
+            }
+
+            if (this.monsters) {
+                this.ui.setMonsterMarkers(this.monsters.monsters, this.camera.position, C.minimapCamSize);
             }
 
             this.world.updateAnimated(time, this.camera, this.player.state);

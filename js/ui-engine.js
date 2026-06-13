@@ -16,6 +16,7 @@
                 boat: document.getElementById("boat-display"),
                 minimapArrow: document.getElementById("minimap-arrow"),
                 minimapContainer: document.getElementById("minimap-container"),
+                monsterMinimapLayer: document.getElementById("monster-minimap-layer"),
                 fpsHud: document.getElementById("fps-hud"),
                 pauseMenu: document.getElementById("pause-menu"),
                 startBtn: document.getElementById("start-btn"),
@@ -36,6 +37,7 @@
             this.lastGear = "";
             this.lastLocation = "";
             this.lastBoat = "";
+            this.monsterDots = [];
         }
 
         setGold(value) {
@@ -102,6 +104,53 @@
         setDirection(angleRadians) {
             const deg = -angleRadians * (180 / Math.PI);
             this.dom.minimapArrow.style.transform = `translate(-50%, -50%) rotate(${deg}deg)`;
+        }
+
+        setMonsterMarkers(monsters, playerPos, minimapSize) {
+            const layer = this.dom.monsterMinimapLayer;
+            const rect = this.dom.minimapContainer.getBoundingClientRect();
+            if (!layer || !rect.width || !playerPos) return;
+
+            const size = minimapSize || 430;
+            const halfWorld = size / 2;
+            const radiusPx = Math.min(rect.width, rect.height) / 2;
+            let visibleCount = 0;
+
+            for (let i = 0; i < monsters.length; i++) {
+                const monster = monsters[i];
+                if (!monster || monster.dead) continue;
+
+                const dx = monster.x - playerPos.x;
+                const dz = monster.z - playerPos.z;
+                if (Math.abs(dx) > halfWorld || Math.abs(dz) > halfWorld) continue;
+
+                const px = rect.width / 2 + (dx / size) * rect.width;
+                const py = rect.height / 2 + (dz / size) * rect.height;
+                const circleDx = px - rect.width / 2;
+                const circleDy = py - rect.height / 2;
+                if (circleDx * circleDx + circleDy * circleDy > radiusPx * radiusPx) continue;
+
+                const dot = this.ensureMonsterDot(visibleCount);
+                dot.className = `monster-dot ${monster.type || "normal"}`;
+                dot.style.left = `${px}px`;
+                dot.style.top = `${py}px`;
+                dot.style.display = "block";
+                visibleCount += 1;
+            }
+
+            for (let i = visibleCount; i < this.monsterDots.length; i++) {
+                this.monsterDots[i].style.display = "none";
+            }
+        }
+
+        ensureMonsterDot(index) {
+            if (this.monsterDots[index]) return this.monsterDots[index];
+            const dot = document.createElement("div");
+            dot.className = "monster-dot";
+            dot.style.display = "none";
+            this.dom.monsterMinimapLayer.appendChild(dot);
+            this.monsterDots[index] = dot;
+            return dot;
         }
 
         showInteraction(label) {

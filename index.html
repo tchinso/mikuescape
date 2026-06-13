@@ -123,6 +123,37 @@
             filter: drop-shadow(0 0 8px rgba(255, 122, 200, 0.8));
         }
 
+        #monster-minimap-layer {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .monster-dot {
+            position: absolute;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #ff2f4f;
+            border: 1px solid rgba(255, 245, 210, 0.86);
+            box-shadow: 0 0 9px rgba(255, 47, 79, 0.92);
+            transform: translate(-50%, -50%);
+        }
+
+        .monster-dot.tank {
+            width: 8px;
+            height: 8px;
+            background: #d7263d;
+        }
+
+        .monster-dot.boss {
+            width: 11px;
+            height: 11px;
+            background: #ff174d;
+            box-shadow: 0 0 13px rgba(255, 23, 77, 1);
+        }
+
         #crosshair {
             position: absolute;
             top: 50%;
@@ -390,6 +421,65 @@
             white-space: nowrap;
         }
 
+        #touch-controls {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 30;
+            pointer-events: none;
+        }
+
+        .joystick {
+            position: absolute;
+            bottom: 28px;
+            width: 116px;
+            height: 116px;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 224, 158, 0.42);
+            background: radial-gradient(circle at 50% 50%, rgba(116, 238, 217, 0.12), rgba(16, 22, 43, 0.52));
+            box-shadow: inset 0 0 26px rgba(116, 238, 217, 0.16), 0 12px 28px rgba(5, 10, 28, 0.34);
+            pointer-events: auto;
+            touch-action: none;
+        }
+
+        #move-joystick {
+            left: 22px;
+        }
+
+        #look-joystick {
+            right: 22px;
+        }
+
+        .joystick-knob {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: linear-gradient(180deg, rgba(255, 242, 184, 0.92), rgba(116, 238, 217, 0.74));
+            box-shadow: 0 0 18px rgba(116, 238, 217, 0.5);
+            transform: translate(-50%, -50%);
+        }
+
+        #touch-fire {
+            position: absolute;
+            right: 154px;
+            bottom: 54px;
+            width: 64px;
+            height: 64px;
+            margin: 0;
+            padding: 0;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 224, 158, 0.46);
+            background: linear-gradient(180deg, rgba(255, 122, 200, 0.92), rgba(174, 57, 110, 0.82));
+            color: white;
+            font-size: 18px;
+            line-height: 1;
+            pointer-events: auto;
+            touch-action: none;
+        }
+
         @media (max-width: 720px) {
             #top-bar {
                 padding: 12px;
@@ -416,6 +506,17 @@
 
             .bars {
                 width: 166px;
+            }
+
+        }
+
+        @media (pointer: coarse) {
+            #touch-controls {
+                display: block;
+            }
+
+            #bottom-bar {
+                padding-bottom: 158px;
             }
         }
     </style>
@@ -461,6 +562,7 @@
                 </div>
             </div>
             <div id="minimap-container">
+                <div id="monster-minimap-layer"></div>
                 <div id="minimap-arrow"></div>
             </div>
         </div>
@@ -468,6 +570,15 @@
         <div id="crosshair"></div>
         <div id="interaction-prompt"></div>
         <div id="toast"></div>
+        <div id="touch-controls" aria-hidden="false">
+            <div id="move-joystick" class="joystick" aria-label="이동 조이스틱">
+                <div class="joystick-knob"></div>
+            </div>
+            <button id="touch-fire" type="button" aria-label="발사">F</button>
+            <div id="look-joystick" class="joystick" aria-label="카메라 조이스틱">
+                <div class="joystick-knob"></div>
+            </div>
+        </div>
 
         <div id="dialog" aria-live="polite">
             <div class="dialog-panel">
@@ -497,13 +608,13 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
-    <script src="js/config.js?v=20260613-monsters1"></script>
+    <script src="js/config.js?v=20260613-controls2"></script>
     <script src="js/fantasy-visuals.js?v=20260613-fantasy4"></script>
     <script src="js/collision-engine.js?v=20260613-fantasy4"></script>
-    <script src="js/ui-engine.js?v=20260613-monsters1"></script>
+    <script src="js/ui-engine.js?v=20260613-controls2"></script>
     <script src="js/map-engine.js?v=20260613-monsters1"></script>
-    <script src="js/player-engine.js?v=20260613-monsters1"></script>
-    <script src="js/monster-engine.js?v=20260613-monsters1"></script>
-    <script src="js/game-engine.js?v=20260613-monsters1"></script>
+    <script src="js/player-engine.js?v=20260613-controls2"></script>
+    <script src="js/monster-engine.js?v=20260613-controls2"></script>
+    <script src="js/game-engine.js?v=20260613-controls2"></script>
 </body>
 </html>

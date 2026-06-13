@@ -29,10 +29,15 @@
         monster: {
             gracePeriod: 60,
             maxAlive: 50,
-            spawnIntervalStart: 22,
-            spawnIntervalMin: 4.8,
-            difficultyRampSeconds: 1500,
-            bossFirstSecond: 900,
+            spawnIntervalStart: 42,
+            spawnIntervalMin: 18,
+            difficultyRampSeconds: 7200,
+            fastFirstSecond: 720,
+            tankFirstSecond: 1500,
+            bossFirstSecond: 3600,
+            forestPhaseSecond: 600,
+            edgePhaseSecond: 1500,
+            worldPhaseSecond: 2700,
             facilityAttackRange: 18
         }
     };
