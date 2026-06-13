@@ -10,17 +10,18 @@
   <main class="app">
     <section class="panel left">
       <h1>4Key Rhythm Runner</h1>
-      <p class="sub">D F J K · 로컬 HTML 실행기</p>
+      <p class="sub">D F J K · 플레이 + 직접 채보 제작</p>
 
       <div class="row">
         <label for="difficulty">Difficulty</label>
         <select id="difficulty">
           <option value="normal">Normal Auto</option>
           <option value="hard" selected>Hard Auto</option>
+          <option value="manual">Manual Edit</option>
         </select>
       </div>
 
-      <div class="row compact">
+      <div class="row compact three">
         <button id="startBtn">Start</button>
         <button id="pauseBtn">Pause</button>
         <button id="restartBtn">Restart</button>
@@ -32,7 +33,7 @@
       </div>
 
       <div class="help">
-        <p><b>조작</b>: D / F / J / K</p>
+        <p><b>플레이</b>: D / F / J / K</p>
         <p><b>판정</b>: Perfect ±45ms · Great ±90ms · Good ±135ms</p>
         <p><b>팁</b>: 음악이 늦게 들리면 offset을 +, 노트가 늦게 맞으면 - 쪽으로 조절해.</p>
       </div>
@@ -44,7 +45,7 @@
         <div><span>Score</span><b id="score">0</b></div>
         <div><span>Combo</span><b id="combo">0</b></div>
         <div><span>Acc</span><b id="accuracy">100.00%</b></div>
-        <div><span>Judge</span><b id="judge">Ready</b></div>
+        <div><span>Status</span><b id="judge">Ready</b></div>
       </div>
     </section>
 
@@ -58,6 +59,53 @@
       </dl>
       <audio id="audio" src="audio.mp3" preload="auto"></audio>
       <p class="sub small">채보는 자동 생성이라 최종 배포용이면 손으로 조금 다듬는 쪽이 좋아.</p>
+    </section>
+
+    <section class="panel editor-panel">
+      <h2>Manual Chart Editor</h2>
+      <p class="sub small">녹음 중에 D/F/J/K를 누르면 그 시간이 Manual Edit 채보에 바로 추가돼.</p>
+
+      <div class="row compact three">
+        <button id="recordStartBtn">Record From Start</button>
+        <button id="recordHereBtn">Record From Current</button>
+        <button id="stopRecordBtn">Stop Record</button>
+      </div>
+
+      <div class="row compact three">
+        <button id="playManualBtn">Playtest Manual</button>
+        <button id="undoNoteBtn">Undo Note</button>
+        <button id="clearManualBtn">Clear Manual</button>
+      </div>
+
+      <div class="row two-cols">
+        <div>
+          <label for="snapSelect">Snap</label>
+          <select id="snapSelect">
+            <option value="none" selected>None · 입력 시간 그대로</option>
+            <option value="8">1/8</option>
+            <option value="12">1/12</option>
+            <option value="16">1/16</option>
+            <option value="24">1/24</option>
+          </select>
+        </div>
+        <div>
+          <label for="recordOffset">Record Offset: <span id="recordOffsetLabel">0</span> ms</label>
+          <input id="recordOffset" type="range" min="-200" max="200" value="0" step="5" />
+        </div>
+      </div>
+
+      <div class="row compact three">
+        <button id="copyChartBtn">Copy chart.json</button>
+        <button id="downloadJsonBtn">Download chart.json</button>
+        <button id="downloadJsBtn">Download chart.js</button>
+      </div>
+
+      <div class="editor-status">
+        <span>Manual Notes: <b id="manualCount">0</b></span>
+        <span id="editorStatus">Ready</span>
+      </div>
+      <textarea id="chartText" spellcheck="false" aria-label="chart json export"></textarea>
+      <p class="sub small">저장된 파일을 기존 `chart.json` / `chart.js`와 교체하면 직접 만든 채보가 들어간 상태로 실행돼.</p>
     </section>
   </main>
 
