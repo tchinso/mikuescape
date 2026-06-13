@@ -279,6 +279,10 @@ button {
   background: linear-gradient(90deg, #38bdf8, #34d399);
 }
 
+.gothic-meter span {
+  background: linear-gradient(90deg, #38bdf8, #a78bfa, #f472b6);
+}
+
 .rhythm-stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

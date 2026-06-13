@@ -7,6 +7,11 @@ import {
   FANART_START_POSITION,
   createFanartSurvival,
 } from "./minigames/fanartSurvival.js";
+import {
+  GOTHIC_FLOOR,
+  GOTHIC_START_POSITION,
+  createGothicMemory,
+} from "./minigames/gothicMemory.js";
 
 const MODEL_DEFS = [
   {
@@ -195,6 +200,14 @@ const dom = {
   survivalMeds: document.querySelector("#survivalMeds"),
   survivalTime: document.querySelector("#survivalTime"),
   survivalHint: document.querySelector("#survivalHint"),
+  gothicHud: document.querySelector("#gothicHud"),
+  gothicSong: document.querySelector("#gothicSong"),
+  gothicStatus: document.querySelector("#gothicStatus"),
+  gothicProgressFill: document.querySelector("#gothicProgressFill"),
+  gothicRound: document.querySelector("#gothicRound"),
+  gothicLength: document.querySelector("#gothicLength"),
+  gothicInput: document.querySelector("#gothicInput"),
+  gothicKeys: document.querySelector("#gothicKeys"),
   popup: document.querySelector("#popup"),
   popupTitle: document.querySelector("#popupTitle"),
   popupBody: document.querySelector("#popupBody"),
@@ -313,6 +326,24 @@ const fanartGame = createFanartSurvival({
   recruitCurrent,
 });
 
+const gothicGame = createGothicMemory({
+  dom,
+  createTextSprite,
+  getCurrentFloor: () => currentFloor,
+  getPlayer: () => player,
+  getCurrentRecruit: () => currentRecruit,
+  isEscapeComplete: () => escapeComplete,
+  clearPointerTarget: () => {
+    pointerTargetActive.value = false;
+  },
+  resetTrail,
+  showMessage,
+  showPopup,
+  updateHud,
+  openExit,
+  recruitCurrent,
+});
+
 init().catch(handleFatalError);
 
 async function init() {
@@ -326,6 +357,7 @@ async function init() {
   audience = createAudience();
   scene.add(audience.group);
   scene.add(fanartGame.createStage().group);
+  scene.add(gothicGame.createStage().group);
 
   await loadModels();
 
@@ -338,6 +370,7 @@ async function init() {
 
   resetRooftopPerformance();
   fanartGame.reset();
+  gothicGame.reset();
   applyFloorTheme();
 
   if (developerShortcutFloor !== null) {
@@ -369,6 +402,10 @@ function bindEvents() {
     }
 
     if (handleRooftopKeyDown(event)) {
+      return;
+    }
+
+    if (gothicGame.handleKeyDown(event)) {
       return;
     }
 
@@ -681,6 +718,9 @@ function spawnRecruit() {
   currentRecruit = actor;
   actors.push(actor);
   scene.add(actor.group);
+  if (currentFloor === GOTHIC_FLOOR) {
+    gothicGame.arrangeActors();
+  }
   updateHud();
 }
 
@@ -942,6 +982,7 @@ function tick() {
 
   updateRooftopStage(dt, elapsed);
   fanartGame.update(dt, elapsed);
+  gothicGame.update(dt, elapsed);
 
   if (player && !escapeComplete) {
     updatePlayer(dt);
@@ -962,7 +1003,7 @@ function tick() {
 }
 
 function updatePlayer(dt) {
-  if (isPopupOpen() || isRooftopPerformancePlaying()) {
+  if (isPopupOpen() || isRooftopPerformancePlaying() || gothicGame.locksPlayerMovement()) {
     return;
   }
 
@@ -1111,6 +1152,10 @@ function checkRecruitCollision() {
     return;
   }
 
+  if (currentFloor === GOTHIC_FLOOR && !gothicGame.isCleared()) {
+    return;
+  }
+
   const distance = player.group.position.distanceTo(currentRecruit.group.position);
   if (distance < 1.05) {
     recruitCurrent();
@@ -1124,6 +1169,11 @@ function recruitCurrent() {
 
   if (currentFloor === FANART_FLOOR && !fanartGame.isCleared()) {
     showMessage("치료약 생존전을 클리어해야 동료가 합류합니다.", 1800);
+    return;
+  }
+
+  if (currentFloor === GOTHIC_FLOOR && !gothicGame.isCleared()) {
+    showMessage("기억 대결을 클리어해야 동료가 합류합니다.", 1800);
     return;
   }
 
@@ -1158,6 +1208,8 @@ function openExit() {
     showMessage("관객 만족! 옥상문이 열렸습니다.", 2400);
   } else if (currentFloor === FANART_FLOOR) {
     showMessage("치료약 확보! 12층 문이 열렸습니다.", 2400);
+  } else if (currentFloor === GOTHIC_FLOOR) {
+    showMessage("Gothic 합류! 11층 문이 열렸습니다.", 2400);
   } else {
     showMessage(currentFloor === 1 ? "출구 개방" : "문 열림");
   }
@@ -1185,6 +1237,11 @@ function advanceDebugStep() {
 
   if (currentFloor === FANART_FLOOR && !fanartGame.isCleared()) {
     showMessage("12층 치료약 생존전을 먼저 클리어해야 합니다.", 1800);
+    return;
+  }
+
+  if (currentFloor === GOTHIC_FLOOR && !gothicGame.isCleared()) {
+    showMessage("11층 기억 대결을 먼저 클리어해야 합니다.", 1800);
     return;
   }
 
@@ -1217,6 +1274,10 @@ function completeDoorTransition() {
     fanartGame.reset();
   }
 
+  if (leavingFloor === GOTHIC_FLOOR) {
+    gothicGame.reset();
+  }
+
   currentFloor -= 1;
   exitOpen = followers.length >= COMPANION_COUNT && currentFloor === 1;
   applyFloorTheme();
@@ -1229,6 +1290,15 @@ function completeDoorTransition() {
     window.setTimeout(() => {
       if (!escapeComplete && currentFloor === FANART_FLOOR) {
         fanartGame.showIntroPopup();
+      }
+    }, 120);
+  }
+
+  if (currentFloor === GOTHIC_FLOOR) {
+    gothicGame.reset({ placePlayer: true });
+    window.setTimeout(() => {
+      if (!escapeComplete && currentFloor === GOTHIC_FLOOR) {
+        gothicGame.showIntroPopup();
       }
     }, 120);
   }
@@ -1255,6 +1325,7 @@ function applyFloorTheme() {
   newSign.material.dispose();
   updateRooftopVisibility();
   fanartGame.updateVisibility();
+  gothicGame.updateVisibility();
 }
 
 function updateHud() {
@@ -1267,6 +1338,8 @@ function updateHud() {
     dom.nextValue.textContent = rooftopGoalText();
   } else if (currentFloor === FANART_FLOOR && !fanartGame.isCleared()) {
     dom.nextValue.textContent = fanartGame.goalText();
+  } else if (currentFloor === GOTHIC_FLOOR && !gothicGame.isCleared()) {
+    dom.nextValue.textContent = gothicGame.goalText();
   } else if (currentRecruit) {
     dom.nextValue.textContent = currentRecruit.def.name;
   } else if (exitOpen && currentFloor === 1) {
@@ -1357,9 +1430,13 @@ function getDeveloperShortcutFloor() {
 }
 
 function getInitialPlayerPosition(shortcutFloor) {
-  return shortcutFloor === FANART_FLOOR
-    ? FANART_START_POSITION
-    : START_POSITION;
+  if (shortcutFloor === FANART_FLOOR) {
+    return FANART_START_POSITION;
+  }
+  if (shortcutFloor === GOTHIC_FLOOR) {
+    return GOTHIC_START_POSITION;
+  }
+  return START_POSITION;
 }
 
 function isDeveloperCookieEnabled() {
@@ -1382,6 +1459,13 @@ function setupDeveloperShortcutFloor(floor) {
     resetTrail();
   }
 
+  if (floor === GOTHIC_FLOOR) {
+    player.group.position.copy(GOTHIC_START_POSITION);
+    player.group.rotation.y = Math.PI;
+    player.previousPosition.copy(player.group.position);
+    resetTrail();
+  }
+
   renderRoster();
   updateHud();
 
@@ -1395,6 +1479,12 @@ function setupDeveloperShortcutFloor(floor) {
 
   if (floor === FANART_FLOOR) {
     fanartGame.showIntroPopup();
+  }
+
+  if (floor === GOTHIC_FLOOR) {
+    gothicGame.reset({ placePlayer: true });
+    gothicGame.arrangeActors();
+    gothicGame.showIntroPopup();
   }
 
   showMessage(`${floor}F 개발자 테스트`);
@@ -1895,6 +1985,7 @@ function resetPrototype() {
   renderRoster();
   resetRooftopPerformance();
   fanartGame.reset();
+  gothicGame.reset();
 
   if (developerShortcutFloor !== null) {
     setupDeveloperShortcutFloor(developerShortcutFloor);
