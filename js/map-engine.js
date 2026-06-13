@@ -1964,5 +1964,388 @@
         });
     };
 
+    MapEngine.prototype.registerPlaces = function () {
+        const mk = (data) => Object.assign({
+            radius: 24,
+            zoneRadius: 30,
+            maxHp: 160,
+            hp: data.maxHp || 160,
+            destroyed: false,
+            label: `${data.title} 메뉴`
+        }, data);
+
+        this.places = [
+            mk({ id: "school-academy", district: "학교", role: "school", service: "training", title: "학교 본관", x: -166, z: -158, radius: 46, zoneRadius: 54, maxHp: 520 }),
+            mk({ id: "school-dorm", district: "학교", role: "school", service: "rest", title: "기숙사", x: -238, z: -120, radius: 24, maxHp: 170 }),
+            mk({ id: "school-observatory", district: "학교", role: "school", service: "skills", title: "관측 연구탑", x: -90, z: -120, radius: 28, maxHp: 230 }),
+            mk({ id: "school-chapel", district: "학교", role: "school", service: "rest", title: "푸른 예배당", x: -110, z: -206, radius: 26, maxHp: 210 }),
+            mk({ id: "school-arena", district: "학교", role: "school", service: "combat", title: "훈련 원형장", x: -104, z: -28, radius: 34, zoneRadius: 38, maxHp: 260 }),
+
+            mk({ id: "capital-palace", district: "왕국", role: "kingdom", service: "missions", title: "왕궁", x: 158, z: -226, radius: 48, zoneRadius: 56, maxHp: 620 }),
+            mk({ id: "capital-guild", district: "왕국", role: "kingdom", service: "missions", title: "기사단 회관", x: 236, z: -88, radius: 30, maxHp: 300 }),
+            mk({ id: "capital-office", district: "왕국", role: "kingdom", service: "repair-missions", title: "관리 사무소", x: 82, z: -88, radius: 26, maxHp: 260 }),
+            mk({ id: "capital-noble-1", district: "왕국", role: "home", title: "북서 귀족 저택", x: 86, z: -176, radius: 23, maxHp: 190 }),
+            mk({ id: "capital-noble-2", district: "왕국", role: "home", title: "동문 귀족 저택", x: 205, z: -120, radius: 23, maxHp: 190 }),
+            mk({ id: "capital-archive", district: "왕국", role: "kingdom", service: "missions", title: "왕립 기록소", x: 112, z: -112, radius: 22, maxHp: 180 }),
+
+            mk({ id: "shop-bakery", district: "상점가", role: "shop", service: "rest", title: "빵집", x: -268, z: 32, radius: 23, maxHp: 160 }),
+            mk({ id: "shop-general", district: "상점가", role: "shop", service: "supplies", title: "잡화점", x: -230, z: -2, radius: 23, maxHp: 160 }),
+            mk({ id: "shop-potion", district: "상점가", role: "shop", service: "potion", title: "물약상", x: -168, z: 20, radius: 23, maxHp: 160 }),
+            mk({ id: "shop-blacksmith", district: "상점가", role: "shop", service: "weapon", title: "대장간", x: -146, z: 72, radius: 24, maxHp: 190 }),
+            mk({ id: "shop-inn", district: "상점가", role: "shop", service: "rest", title: "여관", x: -222, z: 116, radius: 28, maxHp: 180 }),
+            mk({ id: "shop-cloth", district: "상점가", role: "shop", service: "armor", title: "방어구점", x: -282, z: 86, radius: 22, maxHp: 160 }),
+            mk({ id: "shop-magic", district: "상점가", role: "shop", service: "accessory", title: "마도구점", x: -164, z: 112, radius: 22, maxHp: 170 }),
+
+            mk({ id: "village-home-1", district: "마을", role: "home", title: "언덕집", x: -38, z: 38, radius: 22, maxHp: 150 }),
+            mk({ id: "village-home-2", district: "마을", role: "home", title: "남쪽집", x: 0, z: 116, radius: 22, maxHp: 150 }),
+            mk({ id: "village-home-3", district: "마을", role: "home", title: "동쪽집", x: 72, z: 112, radius: 22, maxHp: 150 }),
+            mk({ id: "village-storage", district: "마을", role: "home", service: "storage", title: "공동 창고", x: 118, z: 76, radius: 24, maxHp: 210 }),
+            mk({ id: "village-ruin", district: "마을", role: "home", title: "오래된 회관", x: 62, z: -16, radius: 26, maxHp: 220 }),
+
+            mk({ id: "port", district: "항구", role: "harbor", service: "boat", title: "항구 선착장", x: 184, z: 164, radius: 92, zoneRadius: 96, maxHp: 420 }),
+            mk({ id: "port-fish", district: "항구", role: "harbor", service: "sell", title: "어시장", x: 124, z: 118, radius: 24, maxHp: 170 }),
+            mk({ id: "port-fruit", district: "항구", role: "shop", service: "rest", title: "과일 노점", x: 162, z: 96, radius: 22, maxHp: 150 }),
+            mk({ id: "port-trade", district: "항구", role: "harbor", service: "sell", title: "몬스터 매입소", x: 204, z: 96, radius: 28, maxHp: 220 }),
+            mk({ id: "port-inn", district: "항구", role: "shop", service: "rest", title: "항구 여관", x: 248, z: 122, radius: 24, maxHp: 170 }),
+            mk({ id: "port-repair", district: "항구", role: "shop", service: "supplies", title: "수리 자재상", x: 224, z: 158, radius: 25, maxHp: 200 })
+        ];
+
+        this.buildingIndex = new Map();
+        this.places.forEach((place) => {
+            place.hp = place.maxHp;
+            place.label = `${place.title} 메뉴`;
+            this.buildingIndex.set(place.id, place);
+            this.collision.addInteraction(place);
+        });
+    };
+
+    MapEngine.prototype.getLocation = function (x, z, state) {
+        if (state && state.onBoat && this.isSea(x, z)) return "바다";
+        if (this.isSea(x, z)) return "바다";
+
+        const nearest = this.nearestBuilding(x, z, 34);
+        if (nearest) return nearest.title;
+
+        const districts = [
+            { title: "학교", x: -166, z: -120, r: 118 },
+            { title: "왕국", x: 158, z: -158, r: 130 },
+            { title: "상점가", x: -214, z: 54, r: 114 },
+            { title: "마을", x: 28, z: 66, r: 116 },
+            { title: "항구", x: 184, z: 154, r: 122 }
+        ];
+        for (let i = 0; i < districts.length; i++) {
+            const d = districts[i];
+            const dx = x - d.x;
+            const dz = z - d.z;
+            if (dx * dx + dz * dz <= d.r * d.r) return d.title;
+        }
+        if (this.isForest(x, z)) return "숲";
+        return "월드";
+    };
+
+    MapEngine.prototype.buildingStatusText = function (building) {
+        const hp = Math.max(0, Math.ceil(building.hp));
+        const pct = Math.round((hp / building.maxHp) * 100);
+        return `내구도 ${hp}/${building.maxHp} (${pct}%)${building.destroyed ? " - 파괴됨" : ""}`;
+    };
+
+    MapEngine.prototype.commonBuildingItems = function (building, player, refresh) {
+        const damaged = building.hp < building.maxHp;
+        return [
+            {
+                label: `시설 보수: 자재 1개 보유 ${player.state.repairMaterials}`,
+                disabled: !damaged || player.state.repairMaterials <= 0,
+                action: () => {
+                    player.repairBuilding(building);
+                    refresh();
+                }
+            }
+        ];
+    };
+
+    MapEngine.prototype.handleInteraction = function (item, state, ui, player) {
+        if (!item) return null;
+        if (!player) {
+            ui.showDialog({ title: item.title, body: this.buildingStatusText(item), items: item.items || [] });
+            return null;
+        }
+
+        if (item.role === "harbor" && item.service === "boat") {
+            const boatResult = this.handleBoatInteraction(item, state, ui, player);
+            if (boatResult) return boatResult;
+        }
+
+        const refresh = () => this.handleInteraction(item, state, ui, player);
+        const body = [
+            `${item.district} / ${item.title}`,
+            this.buildingStatusText(item),
+            this.serviceDescription(item, player)
+        ].join("\n");
+
+        const items = [];
+        if (!item.destroyed) {
+            if (item.role === "school") items.push(...this.schoolMenuItems(item, player, refresh));
+            if (item.role === "shop") items.push(...this.shopMenuItems(item, player, refresh));
+            if (item.role === "harbor") items.push(...this.harborMenuItems(item, player, refresh));
+            if (item.role === "kingdom") items.push(...this.kingdomMenuItems(item, player, refresh));
+            if (item.role === "home") items.push({ label: "주민 기록 확인", action: () => ui.showToast("시설 보호 요청과 보수 기록을 확인했습니다.") });
+        } else {
+            items.push({ label: "파괴된 시설입니다. 보수 후 이용 가능", disabled: true });
+        }
+        items.push(...this.commonBuildingItems(item, player, refresh));
+
+        ui.showDialog({ title: item.title, body, items });
+        return null;
+    };
+
+    MapEngine.prototype.handleBoatInteraction = function (item, state, ui, player) {
+        if (state.onBoat) {
+            state.hasBoat = false;
+            state.onBoat = false;
+            state.boatDock = null;
+            ui.setBoatStatus("미보유");
+            ui.showDialog({
+                title: item.title,
+                body: `쪽단배를 항구에 반납했습니다.\n${this.buildingStatusText(item)}`,
+                items: [
+                    { label: "포획 몬스터 판매", disabled: player.state.cargo.length === 0, action: () => { player.sellCargo(); this.handleInteraction(item, state, ui, player); } },
+                    { label: "탄창 30발 구입 - 120G", action: () => { player.buyAmmo(30, 120); this.handleInteraction(item, state, ui, player); } }
+                ]
+            });
+            return { moveTo: this.portLanding, mode: "land" };
+        }
+
+        if (!state.hasBoat) {
+            state.hasBoat = true;
+            state.onBoat = true;
+            state.boatDock = null;
+            ui.setBoatStatus("승선 중");
+            ui.showDialog({
+                title: item.title,
+                body: `쪽단배를 빌렸습니다. 바다로 이동할 수 있습니다.\n${this.buildingStatusText(item)}`,
+                items: ["출항 준비", "항구 시설 이용은 하선 후 가능"]
+            });
+            return { moveTo: this.boatSpawn, mode: "boat" };
+        }
+
+        if (this.isBoatDockedAtPort(state)) {
+            state.hasBoat = false;
+            state.boatDock = null;
+            ui.setBoatStatus("미보유");
+            ui.showDialog({
+                title: item.title,
+                body: `정박한 쪽단배를 항구에 반납했습니다.\n${this.buildingStatusText(item)}`,
+                items: ["쪽단배 반납", "대여 가능"]
+            });
+            return null;
+        }
+
+        return null;
+    };
+
+    MapEngine.prototype.serviceDescription = function (item, player) {
+        if (item.role === "school") return "학교에서는 스킬을 배우거나 전투 스탯을 올릴 수 있습니다.";
+        if (item.service === "weapon") return "무기와 사격 장비를 구입합니다.";
+        if (item.service === "armor") return "보호구와 신발을 구입합니다.";
+        if (item.service === "accessory") return "장신구와 컨테이너 확장품을 구입합니다.";
+        if (item.service === "supplies") return "탄창과 시설 보수 자재를 골드로 구입합니다.";
+        if (item.role === "harbor") return `포획 몬스터 ${player.state.cargo.length}마리를 판매해 골드를 마련할 수 있습니다.`;
+        if (item.role === "kingdom") return "왕국 미션을 받고 완료 보상을 정산합니다.";
+        return "생활 시설입니다. 몬스터 습격 시 내구도가 감소합니다.";
+    };
+
+    MapEngine.prototype.schoolMenuItems = function (item, player, refresh) {
+        const items = [];
+        if (item.service === "training" || item.service === "combat") {
+            items.push(
+                { label: "체력 단련 +10 HP - 140G", action: () => { if (player.spendGold(140, "체력 단련")) { player.state.maxHp += 10; player.heal(10); player.ui.showToast("최대 HP가 증가했습니다."); } refresh(); } },
+                { label: "사격 훈련 +공격 - 160G", action: () => { player.trainStat("attack", 160, "사격 훈련"); refresh(); } },
+                { label: "방어 훈련 +방어 - 150G", action: () => { player.trainStat("defense", 150, "방어 훈련"); refresh(); } },
+                { label: "지구력 훈련 +스태미나 - 120G", action: () => { player.trainStat("stamina", 120, "지구력 훈련"); refresh(); } }
+            );
+        }
+        if (item.service === "skills" || item.service === "training") {
+            items.push(
+                { label: "정밀 조준 스킬 - 420G", disabled: !!player.state.skills.marksmanship, action: () => { player.learnSkill("marksmanship", 420, "정밀 조준"); refresh(); } },
+                { label: "시설 보수학 스킬 - 360G", disabled: !!player.state.skills.repair, action: () => { player.learnSkill("repair", 360, "시설 보수학"); refresh(); } }
+            );
+        }
+        if (item.service === "rest") {
+            items.push({ label: "휴식으로 HP 회복 - 60G", action: () => { if (player.spendGold(60, "휴식")) player.heal(player.state.maxHp); refresh(); } });
+        }
+        return items;
+    };
+
+    MapEngine.prototype.shopMenuItems = function (item, player, refresh) {
+        const items = [];
+        if (item.service === "weapon") {
+            items.push(
+                { label: "강철 마력총 - 450G", action: () => { player.buyEquipment("weapon", { name: "강철 마력총", damage: 18, cost: 450 }); refresh(); } },
+                { label: "에테르 카빈 - 1250G", action: () => { player.buyEquipment("weapon", { name: "에테르 카빈", damage: 42, cost: 1250 }); refresh(); } }
+            );
+        }
+        if (item.service === "armor") {
+            items.push(
+                { label: "보강 코트 - 420G", action: () => { player.buyEquipment("armor", { name: "보강 코트", defense: 4, cost: 420 }); refresh(); } },
+                { label: "수호 판금 - 1200G", action: () => { player.buyEquipment("armor", { name: "수호 판금", defense: 10, cost: 1200 }); refresh(); } },
+                { label: "신속 장화 - 360G", action: () => { player.buyEquipment("shoes", { name: "신속 장화", speed: 0.08, cost: 360 }); refresh(); } },
+                { label: "바람 신발 - 1000G", action: () => { player.buyEquipment("shoes", { name: "바람 신발", speed: 0.16, cost: 1000 }); refresh(); } }
+            );
+        }
+        if (item.service === "accessory") {
+            items.push(
+                { label: "소형 컨테이너 장신구 +8 - 500G", action: () => { player.buyEquipment("accessory", { name: "소형 컨테이너", cargo: 8, cost: 500 }); refresh(); } },
+                { label: "길드 수납 부적 +16 - 1200G", action: () => { player.buyEquipment("accessory", { name: "길드 수납 부적", cargo: 16, cost: 1200 }); refresh(); } }
+            );
+        }
+        if (item.service === "supplies" || item.service === "potion" || item.service === "rest") {
+            items.push(
+                { label: "탄창 30발 - 120G", action: () => { player.buyAmmo(30, 120); refresh(); } },
+                { label: "시설 보수 자재 2개 - 160G", action: () => { player.buyRepairMaterials(2, 160); refresh(); } },
+                { label: "응급 회복 - 100G", action: () => { if (player.spendGold(100, "응급 회복")) player.heal(50); refresh(); } }
+            );
+        }
+        return items;
+    };
+
+    MapEngine.prototype.harborMenuItems = function (item, player, refresh) {
+        return [
+            { label: `포획 몬스터 판매 (${player.state.cargo.length}마리)`, disabled: player.state.cargo.length === 0, action: () => { player.sellCargo(); refresh(); } },
+            { label: "탄창 30발 - 120G", action: () => { player.buyAmmo(30, 120); refresh(); } },
+            { label: "시설 보수 자재 2개 - 160G", action: () => { player.buyRepairMaterials(2, 160); refresh(); } }
+        ];
+    };
+
+    MapEngine.prototype.kingdomMenuItems = function (item, player, refresh) {
+        const missions = [
+            { id: "outside-patrol", type: "outside-kill", title: "숲 밖 몬스터 3마리 퇴치", target: 3, reward: 450 },
+            { id: "facility-repair", type: "repair", title: "내구도 낮은 시설 2회 보수", target: 2, reward: 380 },
+            { id: "boss-hunt", type: "boss", title: "보스 몬스터 1마리 퇴치", target: 1, reward: 1800 }
+        ];
+        return missions.map((mission) => ({
+            label: `${mission.title} - 보상 ${ns.formatGold(mission.reward)}`,
+            action: () => {
+                player.acceptMission(mission);
+                player.updateMissionProgress();
+                refresh();
+            }
+        }));
+    };
+
+    MapEngine.prototype.nearestBuilding = function (x, z, range, predicate) {
+        const max = range || 9999;
+        let best = null;
+        let bestSq = Infinity;
+        for (let i = 0; i < this.places.length; i++) {
+            const building = this.places[i];
+            if (predicate && !predicate(building)) continue;
+            const dx = x - building.x;
+            const dz = z - building.z;
+            const distSq = dx * dx + dz * dz;
+            const reach = max + (building.radius || 20);
+            if (distSq <= reach * reach && distSq < bestSq) {
+                best = building;
+                bestSq = distSq;
+            }
+        }
+        return best;
+    };
+
+    MapEngine.prototype.damageBuilding = function (building, amount) {
+        if (!building || building.destroyed) return false;
+        building.hp = Math.max(0, building.hp - amount);
+        if (building.hp <= 0) {
+            building.destroyed = true;
+        }
+        return true;
+    };
+
+    MapEngine.prototype.repairBuilding = function (building, amount) {
+        if (!building) return false;
+        building.hp = Math.min(building.maxHp, building.hp + amount);
+        if (building.hp > 0) building.destroyed = false;
+        return true;
+    };
+
+    MapEngine.prototype.isForest = function (x, z) {
+        const zones = [
+            { x: -315, z: -126, rx: 72, rz: 132 },
+            { x: -305, z: 86, rx: 68, rz: 132 },
+            { x: 294, z: -10, rx: 58, rz: 174 },
+            { x: 0, z: -248, rx: 260, rz: 38 },
+            { x: -12, z: 194, rx: 270, rz: 34 }
+        ];
+        for (let i = 0; i < zones.length; i++) {
+            if (ellipseHit(x, z, zones[i])) return true;
+        }
+        return x < -292 || x > 286 || z < -226 || (z > 166 && !this.isSea(x, z));
+    };
+
+    MapEngine.prototype.isDeepForest = function (x, z) {
+        const zones = [
+            { x: -320, z: -150, rx: 42, rz: 76 },
+            { x: -312, z: 96, rx: 38, rz: 72 },
+            { x: 304, z: -22, rx: 34, rz: 92 },
+            { x: -20, z: -248, rx: 160, rz: 24 }
+        ];
+        return zones.some((zone) => ellipseHit(x, z, zone));
+    };
+
+    MapEngine.prototype.randomMonsterSpawnPoint = function (rng, phase, playerPos) {
+        const deep = [
+            { x: -320, z: -150, rx: 42, rz: 76 },
+            { x: -312, z: 96, rx: 38, rz: 72 },
+            { x: 304, z: -22, rx: 34, rz: 92 },
+            { x: -20, z: -248, rx: 160, rz: 24 }
+        ];
+        const forest = [
+            { x: -315, z: -126, rx: 72, rz: 132 },
+            { x: -305, z: 86, rx: 68, rz: 132 },
+            { x: 294, z: -10, rx: 58, rz: 174 },
+            { x: 0, z: -248, rx: 260, rz: 38 },
+            { x: -12, z: 194, rx: 270, rz: 34 }
+        ];
+
+        for (let tries = 0; tries < 80; tries++) {
+            let x;
+            let z;
+            if (phase <= 0) {
+                const zone = deep[Math.floor(rng() * deep.length)];
+                x = zone.x + (rng() * 2 - 1) * zone.rx;
+                z = zone.z + (rng() * 2 - 1) * zone.rz;
+            } else if (phase === 1) {
+                const zone = forest[Math.floor(rng() * forest.length)];
+                x = zone.x + (rng() * 2 - 1) * zone.rx;
+                z = zone.z + (rng() * 2 - 1) * zone.rz;
+            } else if (phase === 2) {
+                const zone = forest[Math.floor(rng() * forest.length)];
+                x = zone.x + (rng() * 2 - 1) * (zone.rx + 34);
+                z = zone.z + (rng() * 2 - 1) * (zone.rz + 34);
+            } else {
+                x = C.landBounds.minX + rng() * (C.landBounds.maxX - C.landBounds.minX);
+                z = C.landBounds.minZ + rng() * (C.landBounds.maxZ - C.landBounds.minZ);
+            }
+
+            if (this.isSea(x, z)) continue;
+            if (phase <= 0 && !this.isDeepForest(x, z)) continue;
+            if (phase === 1 && !this.isForest(x, z)) continue;
+            if (playerPos) {
+                const dx = x - playerPos.x;
+                const dz = z - playerPos.z;
+                if (dx * dx + dz * dz < 50 * 50) continue;
+            }
+            return { x, z };
+        }
+        return { x: -320, z: -150 };
+    };
+
+    MapEngine.prototype.showSeaDialog = function (ui) {
+        ui.showDialog({
+            title: "바다",
+            body: "쪽단배에 탄 상태로만 이동할 수 있는 해역입니다. 항구 근처에서 하선하거나 다시 항구로 돌아갈 수 있습니다.",
+            items: ["항해 중", "항구로 돌아가기"]
+        });
+    };
+
     ns.MapEngine = MapEngine;
 })();

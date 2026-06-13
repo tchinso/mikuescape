@@ -18,7 +18,23 @@
         minimapCamSize: 430,
         devGold: 999999999,
         staminaDrain: 22,
-        staminaRegen: 18
+        staminaRegen: 18,
+        playerMaxHp: 100,
+        initialAmmo: 36,
+        initialRepairMaterials: 3,
+        initialCargoCapacity: 10,
+        baseShotDamage: 28,
+        shotCooldown: 0.22,
+        buildingRepairPerMaterial: 35,
+        monster: {
+            gracePeriod: 60,
+            maxAlive: 50,
+            spawnIntervalStart: 22,
+            spawnIntervalMin: 4.8,
+            difficultyRampSeconds: 1500,
+            bossFirstSecond: 900,
+            facilityAttackRange: 18
+        }
     };
 
     ns.Perf = (function () {

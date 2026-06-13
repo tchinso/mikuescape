@@ -4,10 +4,15 @@
     class UIEngine {
         constructor() {
             this.dom = {
+                hpBar: document.getElementById("hp-bar"),
+                hp: document.getElementById("hp-display"),
                 staminaBar: document.getElementById("stamina-bar"),
                 location: document.getElementById("location-display"),
                 pos: document.getElementById("pos-display"),
                 gold: document.getElementById("gold-display"),
+                ammo: document.getElementById("ammo-display"),
+                cargo: document.getElementById("cargo-display"),
+                gear: document.getElementById("gear-display"),
                 boat: document.getElementById("boat-display"),
                 minimapArrow: document.getElementById("minimap-arrow"),
                 minimapContainer: document.getElementById("minimap-container"),
@@ -25,12 +30,46 @@
             this.toastTimer = 0;
             this.dialogVisible = false;
             this.lastStamina = -1;
+            this.lastHp = "";
+            this.lastAmmo = "";
+            this.lastCargo = "";
+            this.lastGear = "";
             this.lastLocation = "";
             this.lastBoat = "";
         }
 
         setGold(value) {
             this.dom.gold.textContent = ns.formatGold(value);
+        }
+
+        setHp(value, maxValue) {
+            const hp = Math.max(0, Math.ceil(value));
+            const maxHp = Math.max(1, Math.ceil(maxValue));
+            const text = `${hp} / ${maxHp}`;
+            if (text === this.lastHp) return;
+            this.lastHp = text;
+            this.dom.hp.textContent = text;
+            this.dom.hpBar.style.width = `${ns.clamp((hp / maxHp) * 100, 0, 100)}%`;
+        }
+
+        setAmmo(value) {
+            const text = `${Math.max(0, Math.floor(value))}`;
+            if (text === this.lastAmmo) return;
+            this.lastAmmo = text;
+            this.dom.ammo.textContent = text;
+        }
+
+        setCargo(count, capacity) {
+            const text = `${count} / ${capacity}`;
+            if (text === this.lastCargo) return;
+            this.lastCargo = text;
+            this.dom.cargo.textContent = text;
+        }
+
+        setGear(text) {
+            if (text === this.lastGear) return;
+            this.lastGear = text;
+            this.dom.gear.textContent = text;
         }
 
         setBoatStatus(text) {
@@ -101,8 +140,17 @@
 
             const items = data.items || [];
             for (let i = 0; i < items.length; i++) {
+                const item = typeof items[i] === "string" ? { label: items[i] } : items[i];
                 const li = document.createElement("li");
-                li.textContent = items[i];
+                li.textContent = item.label || "";
+                if (item.disabled) li.classList.add("disabled");
+                if (item.action && !item.disabled) {
+                    li.addEventListener("pointerdown", (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        item.action();
+                    });
+                }
                 this.dom.dialogMenu.appendChild(li);
             }
 
@@ -138,8 +186,17 @@
 
         const items = data.items || [];
         for (let i = 0; i < items.length; i++) {
+            const item = typeof items[i] === "string" ? { label: items[i] } : items[i];
             const li = document.createElement("li");
-            li.textContent = items[i];
+            li.textContent = item.label || "";
+            if (item.disabled) li.classList.add("disabled");
+            if (item.action && !item.disabled) {
+                li.addEventListener("pointerdown", (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    item.action();
+                });
+            }
             this.dom.dialogMenu.appendChild(li);
         }
 

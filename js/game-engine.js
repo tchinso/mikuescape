@@ -16,6 +16,7 @@
             this.collision = null;
             this.world = null;
             this.player = null;
+            this.monsters = null;
             this.viewportW = window.innerWidth;
             this.viewportH = window.innerHeight;
             this.baseDpr = Math.min(window.devicePixelRatio || 1, Perf.maxDpr);
@@ -66,9 +67,11 @@
             this.collision = new ns.CollisionEngine(C);
             this.world = new ns.MapEngine(this.scene, this.collision).build();
             this.player = new ns.PlayerEngine(this.camera, this.controls, this.world, this.collision, this.ui);
+            this.monsters = new ns.MonsterEngine(this.scene, this.world, this.player, this.ui);
             this.applyInitialSpawn();
             this.syncLookFromCamera();
             this.setupDragLook();
+            this.setupCombatInput();
 
             this.updateMinimapViewportCache();
             window.addEventListener("resize", () => this.onResize());
@@ -179,6 +182,22 @@
             });
         }
 
+        setupCombatInput() {
+            const canvas = this.renderer.domElement;
+            canvas.addEventListener("pointerdown", (event) => {
+                if (event.button !== 0) return;
+                if (!this.gameActive || this.ui.dialogVisible) return;
+                this.player.shoot(this.monsters);
+            });
+
+            window.addEventListener("keydown", (event) => {
+                if (event.code !== "KeyF") return;
+                if (!this.gameActive || this.ui.dialogVisible) return;
+                event.preventDefault();
+                this.player.shoot(this.monsters);
+            });
+        }
+
         setupLights() {
             const ambient = new THREE.AmbientLight(0xfff4df, 0.38);
             this.scene.add(ambient);
@@ -249,6 +268,7 @@
 
             if (this.gameActive) {
                 this.player.update(dt);
+                this.monsters.update(dt);
             } else {
                 this.player.updateHud();
             }
@@ -310,5 +330,6 @@
     }
 
     const game = new GameEngine();
+    ns.game = game;
     game.init();
 })();
