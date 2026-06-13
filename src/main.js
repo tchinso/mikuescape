@@ -1,7 +1,6 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
-import "./styles.css";
 
 const MODEL_DEFS = [
   {
@@ -222,7 +221,7 @@ let escapeComplete = false;
 let loadedCount = 0;
 let messageTimeout = null;
 
-init();
+init().catch(handleFatalError);
 
 async function init() {
   renderRoster();
@@ -243,6 +242,14 @@ async function init() {
   showMessage("13F");
 
   renderer.setAnimationLoop(tick);
+}
+
+function handleFatalError(error) {
+  console.error("Failed to initialize the game.", error);
+  dom.loadingDetail.textContent = `${loadedCount} / ${MODEL_DEFS.length}`;
+  dom.loading.classList.remove("hidden");
+  dom.loading.querySelector("strong").textContent = "모델 로딩 실패";
+  showMessage("모델을 불러오지 못했습니다.", 4000);
 }
 
 function bindEvents() {

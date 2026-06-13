@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ガンパウダー - 4Key Rhythm Runner</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+    <section class="panel left">
+      <h1>4Key Rhythm Runner</h1>
+      <p class="sub">D F J K · 로컬 HTML 실행기</p>
+
+      <div class="row">
+        <label for="difficulty">Difficulty</label>
+        <select id="difficulty">
+          <option value="normal">Normal Auto</option>
+          <option value="hard" selected>Hard Auto</option>
+        </select>
+      </div>
+
+      <div class="row compact">
+        <button id="startBtn">Start</button>
+        <button id="pauseBtn">Pause</button>
+        <button id="restartBtn">Restart</button>
+      </div>
+
+      <div class="row">
+        <label for="offset">Judge Offset: <span id="offsetLabel">0</span> ms</label>
+        <input id="offset" type="range" min="-200" max="200" value="0" step="5" />
+      </div>
+
+      <div class="help">
+        <p><b>조작</b>: D / F / J / K</p>
+        <p><b>판정</b>: Perfect ±45ms · Great ±90ms · Good ±135ms</p>
+        <p><b>팁</b>: 음악이 늦게 들리면 offset을 +, 노트가 늦게 맞으면 - 쪽으로 조절해.</p>
+      </div>
+    </section>
+
+    <section class="game-wrap">
+      <canvas id="game" width="520" height="720"></canvas>
+      <div class="hud">
+        <div><span>Score</span><b id="score">0</b></div>
+        <div><span>Combo</span><b id="combo">0</b></div>
+        <div><span>Acc</span><b id="accuracy">100.00%</b></div>
+        <div><span>Judge</span><b id="judge">Ready</b></div>
+      </div>
+    </section>
+
+    <section class="panel right">
+      <h2 id="songTitle">Song</h2>
+      <dl>
+        <dt>BPM</dt><dd id="bpm">-</dd>
+        <dt>Duration</dt><dd id="duration">-</dd>
+        <dt>Notes</dt><dd id="noteCount">-</dd>
+        <dt>Level</dt><dd id="level">-</dd>
+      </dl>
+      <audio id="audio" src="audio.mp3" preload="auto"></audio>
+      <p class="sub small">채보는 자동 생성이라 최종 배포용이면 손으로 조금 다듬는 쪽이 좋아.</p>
+    </section>
+  </main>
+
+  <script src="chart.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
