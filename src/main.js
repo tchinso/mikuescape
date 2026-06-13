@@ -152,9 +152,11 @@ const FANART_HEALTH_DRAIN_PER_SECOND = FANART_MAX_HEALTH / 6;
 const FANART_HEAL_AMOUNT = 15;
 const FANART_SPEED_MULTIPLIER = 5;
 const FANART_PICKUP_RADIUS = 2.25;
-const FANART_INITIAL_MEDICINE_COUNT = 8;
-const FANART_ACTIVE_MEDICINE_LIMIT = 9;
-const FANART_SPAWN_INTERVAL = 0.9;
+const FANART_INITIAL_MEDICINE_COUNT = 10;
+const FANART_ACTIVE_MEDICINE_LIMIT = 18;
+const FANART_SPAWN_INTERVAL = 0.7;
+const FANART_MEDICINE_MIN_SPACING = 8.5;
+const FANART_MEDICINE_PLAYER_SAFE_RADIUS = 7.5;
 const FANART_MEDICINE_SPAWNS = [
   new THREE.Vector3(-33, 0, -34),
   new THREE.Vector3(-17, 0, -36),
@@ -306,7 +308,7 @@ fanartAudio.preload = "auto";
 
 let player = null;
 let currentRecruit = null;
-let currentFloor = 13;
+let currentFloor = getInitialFloor();
 let exitOpen = false;
 let escapeComplete = false;
 let loadedCount = 0;
@@ -339,6 +341,7 @@ const fanartState = {
 init().catch(handleFatalError);
 
 async function init() {
+  const developerShortcutFloor = getDeveloperShortcutFloor();
   renderRoster();
   bindEvents();
 
@@ -353,19 +356,25 @@ async function init() {
   await loadModels();
 
   player = createActor(MODEL_DEFS[0], "player");
-  player.group.position.copy(START_POSITION);
+  player.group.position.copy(getInitialPlayerPosition(developerShortcutFloor));
   scene.add(player.group);
   actors.push(player);
 
   resetTrail();
 
   resetRooftopPerformance();
+  resetFanartSurvival();
   applyFloorTheme();
-  updateHud();
-  dom.loading.classList.add("hidden");
-  showRooftopIntroPopup();
-  showMessage(ROOFTOP_STAGE_NAME);
 
+  if (developerShortcutFloor !== null) {
+    setupDeveloperShortcutFloor(developerShortcutFloor);
+  } else {
+    updateHud();
+    showRooftopIntroPopup();
+    showMessage(ROOFTOP_STAGE_NAME);
+  }
+
+  dom.loading.classList.add("hidden");
   renderer.setAnimationLoop(tick);
 }
 
@@ -1446,6 +1455,85 @@ function isPopupOpen() {
   return !dom.popup.classList.contains("hidden");
 }
 
+function getInitialFloor() {
+  return getDeveloperShortcutFloor() ?? ROOFTOP_FLOOR;
+}
+
+function getDeveloperShortcutFloor() {
+  if (!isDeveloperCookieEnabled()) {
+    return null;
+  }
+
+  const floorParam = new URLSearchParams(window.location.search).get("floor");
+  if (floorParam === null) {
+    return null;
+  }
+
+  const floor = Number(floorParam);
+  if (!Number.isInteger(floor) || floor < 1 || floor > ROOFTOP_FLOOR) {
+    return null;
+  }
+
+  return floor;
+}
+
+function getInitialPlayerPosition(shortcutFloor) {
+  return shortcutFloor === FANART_FLOOR
+    ? FANART_START_POSITION
+    : START_POSITION;
+}
+
+function isDeveloperCookieEnabled() {
+  return document.cookie
+    .split(";")
+    .map((cookie) => cookie.trim())
+    .some((cookie) => cookie === "developer=true");
+}
+
+function setupDeveloperShortcutFloor(floor) {
+  currentRecruit = null;
+  exitOpen = false;
+
+  seedDeveloperFollowersForFloor(floor);
+  placePartyAtStart();
+
+  if (floor === FANART_FLOOR) {
+    player.group.position.copy(FANART_START_POSITION);
+    player.previousPosition.copy(player.group.position);
+    resetTrail();
+  }
+
+  renderRoster();
+  updateHud();
+
+  if (floor === ROOFTOP_FLOOR) {
+    showRooftopIntroPopup();
+    showMessage(`${ROOFTOP_STAGE_NAME} 개발자 테스트`);
+    return;
+  }
+
+  spawnRecruit();
+
+  if (floor === FANART_FLOOR) {
+    showFanartIntroPopup();
+  }
+
+  showMessage(`${floor}F 개발자 테스트`);
+}
+
+function seedDeveloperFollowersForFloor(floor) {
+  const followerCount = floor <= STANDARD_TOP_FLOOR
+    ? THREE.MathUtils.clamp(STANDARD_TOP_FLOOR - floor, 0, COMPANION_COUNT)
+    : 0;
+
+  for (let i = 1; i <= followerCount; i += 1) {
+    const follower = createActor(MODEL_DEFS[i], "follower");
+    followers.push(follower);
+    actors.push(follower);
+    scene.add(follower.group);
+  }
+}
+
 function showRooftopIntroPopup() {
   showPopup(
     ROOFTOP_STAGE_NAME,
@@ -1645,13 +1733,13 @@ function updateFanartSurvival(dt, elapsed) {
       FANART_MAX_HEALTH,
     );
 
-    fanartState.spawnTimer -= dt;
-    if (fanartState.spawnTimer <= 0) {
-      spawnFanartMedicine();
-      fanartState.spawnTimer = FANART_SPAWN_INTERVAL;
-    }
-
     checkFanartMedicinePickups();
+
+    fanartState.spawnTimer -= dt;
+    while (fanartState.spawnTimer <= 0) {
+      spawnFanartMedicine();
+      fanartState.spawnTimer += FANART_SPAWN_INTERVAL;
+    }
 
     if (fanartState.health <= 0) {
       failFanartSurvival();
@@ -1691,12 +1779,16 @@ function spawnInitialFanartMedicines() {
 
 function spawnFanartMedicine() {
   if (!fanartStage) {
-    return;
+    return false;
+  }
+
+  if (countActiveFanartMedicines() >= FANART_ACTIVE_MEDICINE_LIMIT) {
+    return false;
   }
 
   const inactive = fanartStage.medicineItems.find((item) => !item.active);
   if (!inactive) {
-    return;
+    return false;
   }
 
   const point = getNextFanartMedicinePoint();
@@ -1705,24 +1797,103 @@ function spawnFanartMedicine() {
   inactive.group.rotation.y = Math.random() * Math.PI * 2;
   inactive.active = true;
   inactive.group.visible = true;
+  return true;
 }
 
 function getNextFanartMedicinePoint() {
-  for (let attempt = 0; attempt < FANART_MEDICINE_SPAWNS.length; attempt += 1) {
-    const index = fanartState.spawnCursor % FANART_MEDICINE_SPAWNS.length;
-    fanartState.spawnCursor += 1;
-    const point = FANART_MEDICINE_SPAWNS[index];
-    const occupied = fanartStage.medicineItems.some((item) => (
-      item.active && flatDistance(item.group.position, point) < 5.5
-    ));
-    if (!occupied) {
+  for (let attempt = 0; attempt < 64; attempt += 1) {
+    const point = makeFanartRandomSpawnPoint();
+    if (isFanartMedicinePointUsable(point, FANART_MEDICINE_MIN_SPACING, true)) {
       return point;
     }
   }
 
-  const fallbackIndex = fanartState.spawnCursor % FANART_MEDICINE_SPAWNS.length;
-  fanartState.spawnCursor += 1;
-  return FANART_MEDICINE_SPAWNS[fallbackIndex];
+  for (let attempt = 0; attempt < 64; attempt += 1) {
+    const point = makeFanartRandomSpawnPoint();
+    if (isFanartMedicinePointUsable(point, FANART_MEDICINE_MIN_SPACING, false)) {
+      return point;
+    }
+  }
+
+  for (let attempt = 0; attempt < FANART_MEDICINE_SPAWNS.length; attempt += 1) {
+    const index = fanartState.spawnCursor % FANART_MEDICINE_SPAWNS.length;
+    fanartState.spawnCursor += 1;
+    const point = FANART_MEDICINE_SPAWNS[index].clone();
+    if (isFanartMedicinePointUsable(point, 5.5, false)) {
+      return point;
+    }
+  }
+
+  return getFarthestFanartMedicinePoint();
+}
+
+function makeFanartRandomSpawnPoint() {
+  const origin = player?.group.position ?? FANART_START_POSITION;
+  const angle = Math.random() * Math.PI * 2;
+  const radius = THREE.MathUtils.randFloat(10, 28);
+  const point = new THREE.Vector3(
+    origin.x + Math.cos(angle) * radius,
+    0,
+    origin.z + Math.sin(angle) * radius,
+  );
+  point.x = THREE.MathUtils.clamp(point.x, -ROOM_HALF + 3, ROOM_HALF - 3);
+  point.z = THREE.MathUtils.clamp(point.z, -ROOM_HALF + 3, ROOM_HALF - 3);
+  return point;
+}
+
+function isFanartMedicinePointUsable(point, minSpacing, requireVisible) {
+  if (player && flatDistance(point, player.group.position) < FANART_MEDICINE_PLAYER_SAFE_RADIUS) {
+    return false;
+  }
+
+  if (requireVisible && !isPointInCameraView(point)) {
+    return false;
+  }
+
+  return !fanartStage.medicineItems.some((item) => (
+    item.active && flatDistance(item.group.position, point) < minSpacing
+  ));
+}
+
+function getFarthestFanartMedicinePoint() {
+  let best = FANART_MEDICINE_SPAWNS[0];
+  let bestScore = -Infinity;
+
+  FANART_MEDICINE_SPAWNS.forEach((point) => {
+    const activeDistances = fanartStage.medicineItems
+      .filter((item) => item.active)
+      .map((item) => flatDistance(item.group.position, point));
+    const nearestMedicine = activeDistances.length > 0 ? Math.min(...activeDistances) : 20;
+    const playerDistance = player ? flatDistance(point, player.group.position) : 20;
+    const visibleBonus = isPointInCameraView(point) ? 6 : 0;
+    const score = nearestMedicine + Math.min(playerDistance, 20) * 0.35 + visibleBonus;
+    if (playerDistance >= FANART_MEDICINE_PLAYER_SAFE_RADIUS && score > bestScore) {
+      best = point;
+      bestScore = score;
+    }
+  });
+
+  return best.clone();
+}
+
+function isPointInCameraView(point) {
+  const projected = point.clone();
+  projected.y = 0.4;
+  projected.project(camera);
+  return projected.z >= -1
+    && projected.z <= 1
+    && projected.x >= -0.9
+    && projected.x <= 0.9
+    && projected.y >= -0.92
+    && projected.y <= 0.82;
+}
+
+function countActiveFanartMedicines() {
+  if (!fanartStage) {
+    return 0;
+  }
+
+  return fanartStage.medicineItems.reduce((total, item) => total + (item.active ? 1 : 0), 0);
 }
 
 function checkFanartMedicinePickups() {
@@ -2262,10 +2433,11 @@ function resetTrail() {
 }
 
 function resetPrototype() {
+  const developerShortcutFloor = getDeveloperShortcutFloor();
   pointerTargetActive.value = false;
   exitOpen = false;
   escapeComplete = false;
-  currentFloor = 13;
+  currentFloor = developerShortcutFloor ?? ROOFTOP_FLOOR;
 
   actors.splice(0).forEach((actor) => {
     scene.remove(actor.group);
@@ -2275,7 +2447,7 @@ function resetPrototype() {
   trail.splice(0);
 
   player = createActor(MODEL_DEFS[0], "player");
-  player.group.position.copy(START_POSITION);
+  player.group.position.copy(getInitialPlayerPosition(developerShortcutFloor));
   scene.add(player.group);
   actors.push(player);
 
@@ -2288,9 +2460,14 @@ function resetPrototype() {
   renderRoster();
   resetRooftopPerformance();
   resetFanartSurvival();
-  updateHud();
-  showRooftopIntroPopup();
-  showMessage(ROOFTOP_STAGE_NAME);
+
+  if (developerShortcutFloor !== null) {
+    setupDeveloperShortcutFloor(developerShortcutFloor);
+  } else {
+    updateHud();
+    showRooftopIntroPopup();
+    showMessage(ROOFTOP_STAGE_NAME);
+  }
 }
 
 function disposeActor(actor) {
