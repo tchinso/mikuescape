@@ -1,7 +1,6 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
-import gunpowderChart from "../assets/rhythm/gunpowder-chart.json";
 
 const MODEL_DEFS = [
   {
@@ -123,7 +122,7 @@ const ROOFTOP_FLOOR = 13;
 const STANDARD_TOP_FLOOR = 12;
 const ROOFTOP_STAGE_NAME = "옥상 스테이지";
 const ROOFTOP_AUDIO_URL = new URL("../assets/rhythm/gunpowder-audio.mp3", import.meta.url).href;
-const ROOFTOP_CHART = gunpowderChart.difficulties.normal;
+const ROOFTOP_CHART_URL = new URL("../assets/rhythm/gunpowder-chart.json", import.meta.url).href;
 const RHYTHM_LANE_KEYS = ["Z", "K", "N", "M"];
 const RHYTHM_LANE_CODES = new Map([
   ["KeyZ", 0],
@@ -238,10 +237,8 @@ scene.add(fillLight);
 
 const room = createRoom();
 scene.add(room.group);
-const rhythmStage = createRhythmStage();
-scene.add(rhythmStage.group);
-const audience = createAudience();
-scene.add(audience.group);
+let rhythmStage = null;
+let audience = null;
 
 const loader = new GLTFLoader();
 const loadedScenes = new Map();
@@ -267,6 +264,8 @@ let loadedCount = 0;
 let messageTimeout = null;
 let popupPrimaryAction = null;
 let popupSecondaryAction = null;
+let gunpowderChart = null;
+let rooftopChart = null;
 
 const rhythmState = {
   status: "ready",
@@ -285,6 +284,12 @@ init().catch(handleFatalError);
 async function init() {
   renderRoster();
   bindEvents();
+
+  await loadRhythmChart();
+  rhythmStage = createRhythmStage();
+  scene.add(rhythmStage.group);
+  audience = createAudience();
+  scene.add(audience.group);
 
   await loadModels();
 
@@ -309,8 +314,8 @@ function handleFatalError(error) {
   console.error("Failed to initialize the game.", error);
   dom.loadingDetail.textContent = `${loadedCount} / ${MODEL_DEFS.length}`;
   dom.loading.classList.remove("hidden");
-  dom.loading.querySelector("strong").textContent = "모델 로딩 실패";
-  showMessage("모델을 불러오지 못했습니다.", 4000);
+  dom.loading.querySelector("strong").textContent = "리소스 로딩 실패";
+  showMessage("게임 리소스를 불러오지 못했습니다.", 4000);
 }
 
 function bindEvents() {
@@ -359,10 +364,30 @@ function bindEvents() {
   });
 }
 
+async function loadRhythmChart() {
+  const response = await fetch(ROOFTOP_CHART_URL);
+  if (!response.ok) {
+    throw new Error(`Failed to load rhythm chart: ${response.status} ${ROOFTOP_CHART_URL}`);
+  }
+
+  gunpowderChart = await response.json();
+  rooftopChart = gunpowderChart?.difficulties?.normal;
+
+  if (!Array.isArray(rooftopChart?.notes)) {
+    throw new Error(`Invalid rhythm chart: ${ROOFTOP_CHART_URL}`);
+  }
+}
+
 async function loadModels() {
   await Promise.all(
     MODEL_DEFS.map(async (def) => {
-      const gltf = await loader.loadAsync(def.url);
+      let gltf;
+      try {
+        gltf = await loader.loadAsync(def.url);
+      } catch (error) {
+        console.error(`Failed to load model: ${def.url}`, error);
+        throw error;
+      }
       loadedScenes.set(def.key, gltf.scene);
       loadedCount += 1;
       dom.loadingDetail.textContent = `${loadedCount} / ${MODEL_DEFS.length}`;
@@ -766,7 +791,7 @@ function createRhythmStage() {
     emissive: color,
     emissiveIntensity: 0.35,
   }));
-  const noteMeshes = ROOFTOP_CHART.notes.map((note) => {
+  const noteMeshes = rooftopChart.notes.map((note) => {
     const lane = THREE.MathUtils.clamp(Number(note.lane) || 0, 0, RHYTHM_LANE_X.length - 1);
     const mesh = new THREE.Mesh(noteGeometry, noteMaterials[lane]);
     mesh.position.set(RHYTHM_LANE_X[lane], 0.24, RHYTHM_SPAWN_Z);
@@ -1260,6 +1285,10 @@ function rooftopGoalText() {
 }
 
 function updateRooftopVisibility() {
+  if (!rhythmStage || !audience) {
+    return;
+  }
+
   const visible = currentFloor === ROOFTOP_FLOOR && !escapeComplete;
   rhythmStage.group.visible = visible;
   audience.group.visible = visible;
@@ -1267,7 +1296,7 @@ function updateRooftopVisibility() {
 }
 
 function makeRooftopNotes() {
-  return ROOFTOP_CHART.notes
+  return rooftopChart.notes
     .map((note, index) => ({
       index,
       time: Number(note.time),
@@ -1614,13 +1643,17 @@ function updateRooftopNotes() {
 }
 
 function hideRooftopNotes() {
+  if (!rhythmStage) {
+    return;
+  }
+
   rhythmStage.noteMeshes.forEach((mesh) => {
     mesh.visible = false;
   });
 }
 
 function updateRhythmHud() {
-  dom.rhythmSong.textContent = `${gunpowderChart.title} · Normal`;
+  dom.rhythmSong.textContent = `${gunpowderChart?.title ?? "Gunpowder"} · Normal`;
   dom.rhythmStatus.textContent = rooftopGoalText();
   dom.rhythmLifeText.textContent = `${Math.ceil(rhythmState.life)} / ${RHYTHM_MAX_LIFE}`;
   dom.rhythmLifeFill.style.width = `${Math.max(0, rhythmState.life)}%`;

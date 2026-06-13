@@ -2,4 +2,7 @@ node_modules/
 dist/
 vite.out.log
 vite.err.log
-
+static-root.out.log
+static-root.err.log
+vite-preview.err.log
+vite-preview.out.log
