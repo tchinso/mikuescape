@@ -4549,11 +4549,6 @@
           "type": "tap"
         }
       ]
-    },
-    "manual": {
-      "name": "Manual Edit",
-      "level": "Edit",
-      "notes": []
     }
   },
   "generator": {

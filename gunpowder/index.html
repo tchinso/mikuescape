@@ -3,25 +3,24 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ガンパウダー - 4Key Rhythm Runner</title>
+  <title>ガンパウダー - 4Key Rhythm Balance Simulator</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <main class="app">
     <section class="panel left">
       <h1>4Key Rhythm Runner</h1>
-      <p class="sub">D F J K · 플레이 + 직접 채보 제작</p>
+      <p class="sub">D F J K · 난이도 밸런스 시뮬레이터 포함</p>
 
       <div class="row">
         <label for="difficulty">Difficulty</label>
         <select id="difficulty">
           <option value="normal">Normal Auto</option>
           <option value="hard" selected>Hard Auto</option>
-          <option value="manual">Manual Edit</option>
         </select>
       </div>
 
-      <div class="row compact three">
+      <div class="row compact">
         <button id="startBtn">Start</button>
         <button id="pauseBtn">Pause</button>
         <button id="restartBtn">Restart</button>
@@ -33,9 +32,9 @@
       </div>
 
       <div class="help">
-        <p><b>플레이</b>: D / F / J / K</p>
-        <p><b>판정</b>: Perfect ±45ms · Great ±90ms · Good ±135ms</p>
-        <p><b>팁</b>: 음악이 늦게 들리면 offset을 +, 노트가 늦게 맞으면 - 쪽으로 조절해.</p>
+        <p><b>조작</b>: D / F / J / K · Space: 시작/일시정지</p>
+        <p><b>판정폭</b>: Perfect ±45ms · Great ±90ms · Good ±135ms · Miss 180ms</p>
+        <p><b>Bad</b>: 판정 가능한 노트가 없을 때 키를 누르면 발생해.</p>
       </div>
     </section>
 
@@ -43,9 +42,10 @@
       <canvas id="game" width="520" height="720"></canvas>
       <div class="hud">
         <div><span>Score</span><b id="score">0</b></div>
+        <div><span>Life</span><b id="life">100</b></div>
         <div><span>Combo</span><b id="combo">0</b></div>
         <div><span>Acc</span><b id="accuracy">100.00%</b></div>
-        <div><span>Status</span><b id="judge">Ready</b></div>
+        <div><span>Judge</span><b id="judge">Ready</b></div>
       </div>
     </section>
 
@@ -58,54 +58,58 @@
         <dt>Level</dt><dd id="level">-</dd>
       </dl>
       <audio id="audio" src="audio.mp3" preload="auto"></audio>
-      <p class="sub small">채보는 자동 생성이라 최종 배포용이면 손으로 조금 다듬는 쪽이 좋아.</p>
+      <p class="sub small">아래 밸런스 값을 바꾸면 실제 플레이와 시뮬레이터가 동시에 같은 규칙을 써.</p>
     </section>
 
-    <section class="panel editor-panel">
-      <h2>Manual Chart Editor</h2>
-      <p class="sub small">녹음 중에 D/F/J/K를 누르면 그 시간이 Manual Edit 채보에 바로 추가돼.</p>
-
-      <div class="row compact three">
-        <button id="recordStartBtn">Record From Start</button>
-        <button id="recordHereBtn">Record From Current</button>
-        <button id="stopRecordBtn">Stop Record</button>
+    <section class="panel balance-panel">
+      <h2>게임 이식용 밸런스</h2>
+      <p class="sub small">라이프, 판정별 점수, 콤보 보너스를 조절한 뒤 실제 플레이하거나 시뮬레이션을 돌려봐.</p>
+      <div class="settings-grid">
+        <label>최대 라이프<input id="maxLife" type="number" value="100" min="1" step="1"></label>
+        <label>시작 라이프<input id="startLife" type="number" value="80" min="1" step="1"></label>
+        <label>N콤보 단위<input id="comboStep" type="number" value="10" min="1" step="1"></label>
+        <label>N콤보 점수 가산<input id="comboBonus" type="number" value="50" step="1"></label>
       </div>
-
-      <div class="row compact three">
-        <button id="playManualBtn">Playtest Manual</button>
-        <button id="undoNoteBtn">Undo Note</button>
-        <button id="clearManualBtn">Clear Manual</button>
+      <table class="balance-table">
+        <thead><tr><th>판정</th><th>점수</th><th>라이프 변화</th><th>Acc 가중치</th></tr></thead>
+        <tbody>
+          <tr><th>Perfect</th><td><input id="scorePerfect" type="number" value="1000"></td><td><input id="lifePerfect" type="number" value="2"></td><td><input id="weightPerfect" type="number" value="1" step="0.05"></td></tr>
+          <tr><th>Great</th><td><input id="scoreGreat" type="number" value="700"></td><td><input id="lifeGreat" type="number" value="1"></td><td><input id="weightGreat" type="number" value="0.7" step="0.05"></td></tr>
+          <tr><th>Good</th><td><input id="scoreGood" type="number" value="400"></td><td><input id="lifeGood" type="number" value="0"></td><td><input id="weightGood" type="number" value="0.4" step="0.05"></td></tr>
+          <tr><th>Bad</th><td><input id="scoreBad" type="number" value="0"></td><td><input id="lifeBad" type="number" value="-6"></td><td><input id="weightBad" type="number" value="0" step="0.05"></td></tr>
+          <tr><th>Miss</th><td><input id="scoreMiss" type="number" value="0"></td><td><input id="lifeMiss" type="number" value="-10"></td><td><input id="weightMiss" type="number" value="0" step="0.05"></td></tr>
+        </tbody>
+      </table>
+      <div class="row compact wide-buttons">
+        <button id="resetBalanceBtn">기본값</button>
+        <button id="exportBalanceBtn">설정 JSON 복사</button>
+        <button id="applyBalanceBtn">현재 게임에 적용</button>
       </div>
+    </section>
 
-      <div class="row two-cols">
-        <div>
-          <label for="snapSelect">Snap</label>
-          <select id="snapSelect">
-            <option value="none" selected>None · 입력 시간 그대로</option>
-            <option value="8">1/8</option>
-            <option value="12">1/12</option>
-            <option value="16">1/16</option>
-            <option value="24">1/24</option>
-          </select>
-        </div>
-        <div>
-          <label for="recordOffset">Record Offset: <span id="recordOffsetLabel">0</span> ms</label>
-          <input id="recordOffset" type="range" min="-200" max="200" value="0" step="5" />
-        </div>
+    <section class="panel simulator-panel">
+      <h2>난이도 시뮬레이터</h2>
+      <p class="sub small">가정한 플레이어의 판정 비율로 500회 몬테카를로 테스트를 돌려서, 클리어율과 평균 점수를 추정해.</p>
+      <div class="profile-grid">
+        <label>Perfect %<input id="ratePerfect" type="number" value="55" min="0" max="100" step="1"></label>
+        <label>Great %<input id="rateGreat" type="number" value="25" min="0" max="100" step="1"></label>
+        <label>Good %<input id="rateGood" type="number" value="10" min="0" max="100" step="1"></label>
+        <label>Bad %<input id="rateBad" type="number" value="3" min="0" max="100" step="1"></label>
+        <label>Miss %<input id="rateMiss" type="number" value="7" min="0" max="100" step="1"></label>
+        <label>시뮬 횟수<input id="simTrials" type="number" value="500" min="10" max="5000" step="10"></label>
       </div>
-
-      <div class="row compact three">
-        <button id="copyChartBtn">Copy chart.json</button>
-        <button id="downloadJsonBtn">Download chart.json</button>
-        <button id="downloadJsBtn">Download chart.js</button>
+      <div class="row compact sim-buttons">
+        <button id="presetEasyBtn">쉬운 플레이어</button>
+        <button id="presetMidBtn">보통 플레이어</button>
+        <button id="presetHardBtn">서툰 플레이어</button>
       </div>
-
-      <div class="editor-status">
-        <span>Manual Notes: <b id="manualCount">0</b></span>
-        <span id="editorStatus">Ready</span>
+      <div class="row compact sim-buttons">
+        <button id="runSimBtn">시뮬레이션 실행</button>
+        <button id="strictPresetBtn">살짝 엄격한 규칙</button>
+        <button id="softPresetBtn">관대한 규칙</button>
       </div>
-      <textarea id="chartText" spellcheck="false" aria-label="chart json export"></textarea>
-      <p class="sub small">저장된 파일을 기존 `chart.json` / `chart.js`와 교체하면 직접 만든 채보가 들어간 상태로 실행돼.</p>
+      <div id="rateTotal" class="rate-total">합계: 100%</div>
+      <div id="simResult" class="sim-result">아직 실행 전이야.</div>
     </section>
   </main>
 

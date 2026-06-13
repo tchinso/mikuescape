@@ -1,65 +1,62 @@
 (() => {
   const chart = window.CHART;
-  chart.difficulties = chart.difficulties || {};
-  if (!chart.difficulties.manual) {
-    chart.difficulties.manual = { name: 'Manual Edit', level: 'Edit', notes: [] };
-  }
-
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
   const audio = document.getElementById('audio');
 
-  const difficultyEl = document.getElementById('difficulty');
-  const startBtn = document.getElementById('startBtn');
-  const pauseBtn = document.getElementById('pauseBtn');
-  const restartBtn = document.getElementById('restartBtn');
-  const offsetEl = document.getElementById('offset');
-  const offsetLabel = document.getElementById('offsetLabel');
+  const $ = (id) => document.getElementById(id);
+  const difficultyEl = $('difficulty');
+  const startBtn = $('startBtn');
+  const pauseBtn = $('pauseBtn');
+  const restartBtn = $('restartBtn');
+  const offsetEl = $('offset');
+  const offsetLabel = $('offsetLabel');
 
-  const recordStartBtn = document.getElementById('recordStartBtn');
-  const recordHereBtn = document.getElementById('recordHereBtn');
-  const stopRecordBtn = document.getElementById('stopRecordBtn');
-  const playManualBtn = document.getElementById('playManualBtn');
-  const undoNoteBtn = document.getElementById('undoNoteBtn');
-  const clearManualBtn = document.getElementById('clearManualBtn');
-  const snapSelect = document.getElementById('snapSelect');
-  const recordOffsetEl = document.getElementById('recordOffset');
-  const recordOffsetLabel = document.getElementById('recordOffsetLabel');
-  const copyChartBtn = document.getElementById('copyChartBtn');
-  const downloadJsonBtn = document.getElementById('downloadJsonBtn');
-  const downloadJsBtn = document.getElementById('downloadJsBtn');
-  const manualCountEl = document.getElementById('manualCount');
-  const editorStatusEl = document.getElementById('editorStatus');
-  const chartTextEl = document.getElementById('chartText');
-
-  const scoreEl = document.getElementById('score');
-  const comboEl = document.getElementById('combo');
-  const accuracyEl = document.getElementById('accuracy');
-  const judgeEl = document.getElementById('judge');
-  const songTitleEl = document.getElementById('songTitle');
-  const bpmEl = document.getElementById('bpm');
-  const durationEl = document.getElementById('duration');
-  const noteCountEl = document.getElementById('noteCount');
-  const levelEl = document.getElementById('level');
+  const scoreEl = $('score');
+  const lifeEl = $('life');
+  const comboEl = $('combo');
+  const accuracyEl = $('accuracy');
+  const judgeEl = $('judge');
+  const songTitleEl = $('songTitle');
+  const bpmEl = $('bpm');
+  const durationEl = $('duration');
+  const noteCountEl = $('noteCount');
+  const levelEl = $('level');
 
   const keyToLane = { KeyD: 0, KeyF: 1, KeyJ: 2, KeyK: 3 };
   const laneLabels = ['D', 'F', 'J', 'K'];
-  const judgeScore = { Perfect: 1000, Great: 700, Good: 400, Miss: 0 };
-  const judgeWeight = { Perfect: 1, Great: 0.7, Good: 0.4, Miss: 0 };
+  const JUDGES = ['Perfect', 'Great', 'Good', 'Bad', 'Miss'];
+  const DEFAULT_BALANCE = {
+    maxLife: 100,
+    startLife: 80,
+    comboStep: 10,
+    comboBonus: 50,
+    score: { Perfect: 1000, Great: 700, Good: 400, Bad: 0, Miss: 0 },
+    life: { Perfect: 2, Great: 1, Good: 0, Bad: -6, Miss: -10 },
+    weight: { Perfect: 1, Great: 0.7, Good: 0.4, Bad: 0, Miss: 0 },
+  };
+
+  const balanceIds = {
+    maxLife: 'maxLife', startLife: 'startLife', comboStep: 'comboStep', comboBonus: 'comboBonus',
+    score: { Perfect: 'scorePerfect', Great: 'scoreGreat', Good: 'scoreGood', Bad: 'scoreBad', Miss: 'scoreMiss' },
+    life: { Perfect: 'lifePerfect', Great: 'lifeGreat', Good: 'lifeGood', Bad: 'lifeBad', Miss: 'lifeMiss' },
+    weight: { Perfect: 'weightPerfect', Great: 'weightGreat', Good: 'weightGood', Bad: 'weightBad', Miss: 'weightMiss' },
+  };
 
   const state = {
     notes: [],
     running: false,
-    recording: false,
     paused: false,
+    failed: false,
     score: 0,
+    life: DEFAULT_BALANCE.startLife,
     combo: 0,
     maxCombo: 0,
     judged: 0,
     accWeight: 0,
+    counts: { Perfect: 0, Great: 0, Good: 0, Bad: 0, Miss: 0 },
     lastJudge: 'Ready',
     keyFlash: [0,0,0,0],
-    editorHistory: [],
   };
 
   const layout = {
@@ -74,33 +71,47 @@
     missWindow: 0.180,
   };
 
-  function selectedDifficulty() {
-    return chart.difficulties[difficultyEl.value] || chart.difficulties.hard || chart.difficulties.manual;
+  function num(id, fallback = 0) {
+    const el = $(id);
+    const value = Number(el?.value);
+    return Number.isFinite(value) ? value : fallback;
   }
 
-  function manualDifficulty() {
-    return chart.difficulties.manual;
-  }
-
-  function sanitizeNote(note) {
-    return {
-      time: roundTime(Number(note.time)),
-      lane: Math.max(0, Math.min(3, Number(note.lane))),
-      type: note.type || 'tap',
+  function readBalance() {
+    const balance = {
+      maxLife: Math.max(1, num(balanceIds.maxLife, DEFAULT_BALANCE.maxLife)),
+      startLife: Math.max(1, num(balanceIds.startLife, DEFAULT_BALANCE.startLife)),
+      comboStep: Math.max(1, Math.floor(num(balanceIds.comboStep, DEFAULT_BALANCE.comboStep))),
+      comboBonus: num(balanceIds.comboBonus, DEFAULT_BALANCE.comboBonus),
+      score: {}, life: {}, weight: {},
     };
+    for (const judge of JUDGES) {
+      balance.score[judge] = num(balanceIds.score[judge], DEFAULT_BALANCE.score[judge]);
+      balance.life[judge] = num(balanceIds.life[judge], DEFAULT_BALANCE.life[judge]);
+      balance.weight[judge] = num(balanceIds.weight[judge], DEFAULT_BALANCE.weight[judge]);
+    }
+    balance.startLife = Math.min(balance.startLife, balance.maxLife);
+    return balance;
   }
 
-  function roundTime(value) {
-    return Number(Math.max(0, value).toFixed(3));
+  function writeBalance(balance) {
+    $(balanceIds.maxLife).value = balance.maxLife;
+    $(balanceIds.startLife).value = balance.startLife;
+    $(balanceIds.comboStep).value = balance.comboStep;
+    $(balanceIds.comboBonus).value = balance.comboBonus;
+    for (const judge of JUDGES) {
+      $(balanceIds.score[judge]).value = balance.score[judge];
+      $(balanceIds.life[judge]).value = balance.life[judge];
+      $(balanceIds.weight[judge]).value = balance.weight[judge];
+    }
   }
 
-  function sortNotes(notes) {
-    notes.sort((a, b) => a.time - b.time || a.lane - b.lane);
+  function selectedDifficulty() {
+    return chart.difficulties[difficultyEl.value] || chart.difficulties.hard;
   }
 
   function cloneNotes() {
-    const diff = selectedDifficulty();
-    return (diff.notes || []).map((note, index) => ({
+    return selectedDifficulty().notes.map((note, index) => ({
       index,
       time: Number(note.time),
       lane: Number(note.lane),
@@ -108,10 +119,6 @@
       hit: false,
       missed: false,
     }));
-  }
-
-  function rebuildStateNotes() {
-    state.notes = cloneNotes();
   }
 
   function formatTime(sec) {
@@ -125,85 +132,57 @@
     songTitleEl.textContent = chart.title || 'Song';
     bpmEl.textContent = chart.bpm;
     durationEl.textContent = formatTime(chart.duration || audio.duration || 0);
-    noteCountEl.textContent = (diff.notes || []).length;
+    noteCountEl.textContent = diff.notes.length;
     levelEl.textContent = diff.level ?? '-';
-    manualCountEl.textContent = (manualDifficulty().notes || []).length;
-  }
-
-  function resetScoreOnly() {
-    state.score = 0;
-    state.combo = 0;
-    state.maxCombo = 0;
-    state.judged = 0;
-    state.accWeight = 0;
-    state.lastJudge = 'Ready';
-    state.keyFlash = [0,0,0,0];
   }
 
   function resetGame() {
     audio.pause();
     audio.currentTime = 0;
+    const balance = readBalance();
+    state.notes = cloneNotes();
     state.running = false;
-    state.recording = false;
     state.paused = false;
-    resetScoreOnly();
-    rebuildStateNotes();
+    state.failed = false;
+    state.score = 0;
+    state.life = balance.startLife;
+    state.combo = 0;
+    state.maxCombo = 0;
+    state.judged = 0;
+    state.accWeight = 0;
+    state.counts = { Perfect: 0, Great: 0, Good: 0, Bad: 0, Miss: 0 };
+    state.lastJudge = 'Ready';
+    state.keyFlash = [0,0,0,0];
     updateHud();
     updateInfo();
-    updateExportText();
   }
 
   async function startGame() {
-    stopRecordSilent();
-    rebuildStateNotes();
-    resetScoreOnly();
+    if (!state.notes.length || state.failed) resetGame();
     state.running = true;
     state.paused = false;
     state.lastJudge = 'Go';
-    try {
-      await audio.play();
-    } catch (err) {
-      state.running = false;
-      state.lastJudge = 'Click Start again';
-    }
+    try { await audio.play(); }
+    catch (err) { state.lastJudge = 'Click Start again'; }
     updateHud();
   }
 
   function pauseGame() {
-    if (!state.running && !state.recording) return;
+    if (!state.running || state.failed) return;
     if (audio.paused) {
       audio.play();
       state.paused = false;
-      state.lastJudge = state.recording ? 'REC' : 'Resume';
-      setEditorStatus(state.recording ? 'Recording resumed' : 'Ready');
+      state.lastJudge = 'Resume';
     } else {
       audio.pause();
       state.paused = true;
       state.lastJudge = 'Pause';
-      setEditorStatus(state.recording ? 'Recording paused' : 'Paused');
     }
     updateHud();
   }
 
   function currentSongTime() {
     return audio.currentTime + Number(offsetEl.value) / 1000;
-  }
-
-  function recordSongTime() {
-    const raw = audio.currentTime + Number(recordOffsetEl.value) / 1000;
-    return applySnap(raw);
-  }
-
-  function applySnap(time) {
-    const snap = snapSelect.value;
-    if (snap === 'none') return roundTime(time);
-    const bpm = Number(chart.bpm) || 120;
-    const beat = 60 / bpm;
-    const division = Number(snap);
-    const step = beat * 4 / division;
-    const anchor = Number(chart.offset) || 0;
-    const snapped = anchor + Math.round((time - anchor) / step) * step;
-    return roundTime(snapped);
   }
 
   function judgeName(deltaAbs) {
@@ -213,79 +192,67 @@
     return null;
   }
 
-  function handleHit(lane) {
-    if (state.recording) {
-      recordNote(lane);
-      return;
-    }
-    if (!state.running || state.paused) return;
+  function comboBonusFor(combo, balance) {
+    if (combo < balance.comboStep) return 0;
+    return Math.floor(combo / balance.comboStep) * balance.comboBonus;
+  }
 
+  function applyJudge(judge, note = null, deltaMs = null) {
+    const balance = readBalance();
+    if (note) note.hit = true;
+    const comboContinues = judge === 'Perfect' || judge === 'Great';
+    if (comboContinues) {
+      state.combo += 1;
+      state.maxCombo = Math.max(state.maxCombo, state.combo);
+    } else {
+      state.combo = 0;
+    }
+    state.score += balance.score[judge] + (comboContinues ? comboBonusFor(state.combo, balance) : 0);
+    state.life = Math.max(0, Math.min(balance.maxLife, state.life + balance.life[judge]));
+    state.judged += 1;
+    state.accWeight += balance.weight[judge];
+    state.counts[judge] += 1;
+    state.lastJudge = deltaMs === null ? judge : `${judge} ${deltaMs}ms`;
+    if (state.life <= 0) failGame();
+    updateHud();
+  }
+
+  function failGame() {
+    state.failed = true;
+    state.running = false;
+    state.paused = false;
+    audio.pause();
+    state.lastJudge = `Failed · Max ${state.maxCombo}`;
+  }
+
+  function handleHit(lane) {
+    if (!state.running || state.paused || state.failed) return;
     const now = currentSongTime();
     let best = null;
     let bestDelta = Infinity;
     for (const note of state.notes) {
       if (note.hit || note.missed || note.lane !== lane) continue;
       const delta = Math.abs(note.time - now);
-      if (delta < bestDelta) {
-        best = note;
-        bestDelta = delta;
-      }
+      if (delta < bestDelta) { best = note; bestDelta = delta; }
       if (note.time - now > layout.missWindow) break;
     }
     const judge = best ? judgeName(bestDelta) : null;
+    state.keyFlash[lane] = 1;
     if (!best || !judge) {
-      state.lastJudge = 'Bad';
-      state.combo = 0;
-      state.keyFlash[lane] = 1;
-      updateHud();
+      applyJudge('Bad');
       return;
     }
-    best.hit = true;
-    state.judged += 1;
-    state.accWeight += judgeWeight[judge];
-    state.combo += 1;
-    state.maxCombo = Math.max(state.maxCombo, state.combo);
-    state.score += judgeScore[judge] + state.combo * 2;
-    state.lastJudge = `${judge} ${Math.round((now - best.time)*1000)}ms`;
-    state.keyFlash[lane] = 1;
-    updateHud();
-  }
-
-  function recordNote(lane) {
-    if (state.paused) return;
-    const notes = manualDifficulty().notes;
-    const time = recordSongTime();
-    const dupe = notes.some(note => note.lane === lane && Math.abs(Number(note.time) - time) < 0.030);
-    state.keyFlash[lane] = 1;
-    if (dupe) {
-      state.lastJudge = `Dup ${laneLabels[lane]}`;
-      setEditorStatus(`Duplicate skipped · ${laneLabels[lane]} @ ${time.toFixed(3)}s`);
-      updateHud();
-      return;
-    }
-
-    const note = { time, lane, type: 'tap' };
-    notes.push(note);
-    sortNotes(notes);
-    state.editorHistory.push({ time, lane });
-    rebuildStateNotes();
-    state.lastJudge = `REC ${laneLabels[lane]}`;
-    setEditorStatus(`Added ${laneLabels[lane]} @ ${time.toFixed(3)}s`);
-    updateHud();
-    updateInfo();
-    updateExportText();
+    applyJudge(judge, best, Math.round((now - best.time) * 1000));
   }
 
   function markMisses() {
-    if (!state.running || state.paused || state.recording) return;
+    if (!state.running || state.paused || state.failed) return;
     const now = currentSongTime();
     for (const note of state.notes) {
       if (note.hit || note.missed) continue;
       if (now - note.time > layout.missWindow) {
         note.missed = true;
-        state.judged += 1;
-        state.combo = 0;
-        state.lastJudge = 'Miss';
+        applyJudge('Miss');
       } else if (note.time - now > layout.approach + 0.25) {
         break;
       }
@@ -293,17 +260,18 @@
   }
 
   function updateHud() {
-    scoreEl.textContent = state.recording ? 'REC' : Math.floor(state.score).toLocaleString();
-    comboEl.textContent = state.recording ? (manualDifficulty().notes || []).length : state.combo;
+    const balance = readBalance();
+    scoreEl.textContent = Math.floor(state.score).toLocaleString();
+    lifeEl.textContent = `${Math.ceil(state.life)}/${balance.maxLife}`;
+    comboEl.textContent = state.combo;
     const acc = state.judged ? (state.accWeight / state.judged) * 100 : 100;
-    accuracyEl.textContent = state.recording ? formatTime(audio.currentTime || 0) : `${acc.toFixed(2)}%`;
+    accuracyEl.textContent = `${acc.toFixed(2)}%`;
     judgeEl.textContent = state.lastJudge;
   }
 
   function draw() {
     markMisses();
-    const w = canvas.width;
-    const h = canvas.height;
+    const w = canvas.width, h = canvas.height;
     const laneW = layout.playW / layout.laneCount;
     ctx.clearRect(0, 0, w, h);
 
@@ -329,9 +297,16 @@
     ctx.strokeStyle = 'rgba(255,255,255,0.10)';
     ctx.strokeRect(layout.playX, layout.playY, layout.playW, layout.playH);
 
-    ctx.fillStyle = state.recording ? 'rgba(255, 111, 145, 0.18)' : 'rgba(255, 207, 102, 0.18)';
+    const balance = readBalance();
+    const lifeRatio = Math.max(0, Math.min(1, state.life / balance.maxLife));
+    ctx.fillStyle = 'rgba(255,255,255,0.10)';
+    roundRect(ctx, layout.playX, 32, layout.playW, 14, 7, true, false);
+    ctx.fillStyle = lifeRatio < 0.25 ? '#ff6f91' : '#75e6a0';
+    roundRect(ctx, layout.playX, 32, layout.playW * lifeRatio, 14, 7, true, false);
+
+    ctx.fillStyle = 'rgba(255, 207, 102, 0.18)';
     ctx.fillRect(layout.playX, layout.receptorY - 7, layout.playW, 14);
-    ctx.strokeStyle = state.recording ? '#ff6f91' : '#ffcf66';
+    ctx.strokeStyle = '#ffcf66';
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(layout.playX, layout.receptorY);
@@ -339,15 +314,7 @@
     ctx.stroke();
     ctx.lineWidth = 1;
 
-    const now = state.recording ? audio.currentTime : currentSongTime();
-    drawNotes(now, laneW);
-    drawLaneLabels(laneW);
-    drawOverlay(w, h);
-
-    requestAnimationFrame(draw);
-  }
-
-  function drawNotes(now, laneW) {
+    const now = currentSongTime();
     for (const note of state.notes) {
       if (note.hit || note.missed) continue;
       const dt = note.time - now;
@@ -358,15 +325,13 @@
       const nw = laneW - 16;
       const alpha = Math.max(0.25, 1 - Math.max(0, dt - layout.approach + 0.25));
       ctx.globalAlpha = alpha;
-      ctx.fillStyle = state.recording ? '#ff6f91' : '#ffcf66';
+      ctx.fillStyle = '#ffcf66';
       roundRect(ctx, x, y - layout.noteH / 2, nw, layout.noteH, 7, true, false);
       ctx.fillStyle = 'rgba(255,255,255,0.55)';
       ctx.fillRect(x + 8, y - 2, nw - 16, 4);
       ctx.globalAlpha = 1;
     }
-  }
 
-  function drawLaneLabels(laneW) {
     for (let i = 0; i < layout.laneCount; i++) {
       const x = layout.playX + i * laneW;
       if (state.keyFlash[i] > 0) {
@@ -379,26 +344,17 @@
       ctx.textAlign = 'center';
       ctx.fillText(laneLabels[i], x + laneW / 2, layout.receptorY + 48);
     }
-  }
 
-  function drawOverlay(w, h) {
-    if (!state.running && !state.recording) {
+    if (!state.running) {
       ctx.fillStyle = 'rgba(0,0,0,0.48)';
       ctx.fillRect(0,0,w,h);
       ctx.fillStyle = '#f5f7ff';
       ctx.textAlign = 'center';
       ctx.font = '800 30px system-ui, sans-serif';
-      ctx.fillText('Click Start or Record', w/2, h/2 - 12);
+      ctx.fillText(state.failed ? 'Failed' : 'Click Start', w/2, h/2 - 12);
       ctx.font = '500 16px system-ui, sans-serif';
       ctx.fillStyle = 'rgba(245,247,255,0.74)';
-      ctx.fillText('D  F  J  K', w/2, h/2 + 24);
-    }
-
-    if (state.recording) {
-      ctx.fillStyle = 'rgba(255,111,145,0.90)';
-      ctx.textAlign = 'left';
-      ctx.font = '800 16px system-ui, sans-serif';
-      ctx.fillText('● RECORDING', layout.playX, layout.playY - 20);
+      ctx.fillText(state.failed ? 'Restart로 다시 시작' : 'D  F  J  K', w/2, h/2 + 24);
     }
 
     if (state.paused) {
@@ -409,6 +365,7 @@
       ctx.font = '800 30px system-ui, sans-serif';
       ctx.fillText('Paused', w/2, h/2);
     }
+    requestAnimationFrame(draw);
   }
 
   function roundRect(ctx, x, y, width, height, radius, fill, stroke) {
@@ -424,146 +381,127 @@
     if (stroke) ctx.stroke();
   }
 
-  async function startRecording(fromStart) {
-    audio.pause();
-    state.running = false;
-    state.recording = true;
-    state.paused = false;
-    difficultyEl.value = 'manual';
-    rebuildStateNotes();
-    if (fromStart) audio.currentTime = 0;
-    state.lastJudge = 'REC';
-    setEditorStatus(fromStart ? 'Recording from start' : `Recording from ${formatTime(audio.currentTime)}`);
-    updateInfo();
-    updateHud();
-    try {
-      await audio.play();
-    } catch (err) {
-      state.recording = false;
-      state.lastJudge = 'Click Record again';
-      setEditorStatus('Audio play was blocked by browser');
-      updateHud();
-    }
-  }
-
-  function stopRecordSilent() {
-    if (!state.recording) return;
-    state.recording = false;
-    state.paused = false;
-  }
-
-  function stopRecording() {
-    if (!state.recording) return;
-    audio.pause();
-    state.recording = false;
-    state.paused = false;
-    state.lastJudge = 'Record Stop';
-    setEditorStatus('Recording stopped');
-    updateHud();
-    updateInfo();
-    updateExportText();
-  }
-
-  function undoManualNote() {
-    const notes = manualDifficulty().notes;
-    if (!notes.length) return;
-    const last = state.editorHistory.pop();
-    let index = -1;
-    if (last) {
-      index = notes.findLastIndex(note => note.lane === last.lane && Math.abs(Number(note.time) - last.time) < 0.001);
-    }
-    if (index < 0) index = notes.length - 1;
-    const [removed] = notes.splice(index, 1);
-    sortNotes(notes);
-    rebuildStateNotes();
-    state.lastJudge = 'Undo';
-    setEditorStatus(`Removed ${laneLabels[removed.lane]} @ ${Number(removed.time).toFixed(3)}s`);
-    updateHud();
-    updateInfo();
-    updateExportText();
-  }
-
-  function clearManualNotes() {
-    if (!manualDifficulty().notes.length) return;
-    const ok = window.confirm('Manual Edit 채보를 전부 지울까?');
-    if (!ok) return;
-    manualDifficulty().notes = [];
-    state.editorHistory = [];
-    rebuildStateNotes();
-    state.lastJudge = 'Clear';
-    setEditorStatus('Manual chart cleared');
-    updateHud();
-    updateInfo();
-    updateExportText();
-  }
-
-  function buildExportChart() {
-    const exported = JSON.parse(JSON.stringify(chart));
-    for (const diff of Object.values(exported.difficulties || {})) {
-      diff.notes = (diff.notes || []).map(sanitizeNote);
-      sortNotes(diff.notes);
-    }
-    exported.generator = exported.generator || {};
-    exported.generator.manual_editor = {
-      note: 'Manual Edit notes were recorded in the browser by pressing D/F/J/K.',
-      updated_at_local: new Date().toISOString(),
+  function rateValues() {
+    return {
+      Perfect: num('ratePerfect', 0),
+      Great: num('rateGreat', 0),
+      Good: num('rateGood', 0),
+      Bad: num('rateBad', 0),
+      Miss: num('rateMiss', 0),
     };
-    return exported;
   }
 
-  function updateExportText() {
-    const exported = buildExportChart();
-    chartTextEl.value = JSON.stringify(exported, null, 2);
-    manualCountEl.textContent = (manualDifficulty().notes || []).length;
+  function updateRateTotal() {
+    const rates = rateValues();
+    const total = Object.values(rates).reduce((a,b) => a + b, 0);
+    const el = $('rateTotal');
+    el.textContent = `합계: ${total.toFixed(1)}%` + (Math.abs(total - 100) > 0.01 ? ' · 자동 정규화해서 계산함' : '');
+    el.classList.toggle('warn', Math.abs(total - 100) > 0.01);
   }
 
-  async function copyChartJson() {
-    updateExportText();
-    try {
-      await navigator.clipboard.writeText(chartTextEl.value);
-      setEditorStatus('chart.json copied');
-    } catch (err) {
-      chartTextEl.focus();
-      chartTextEl.select();
-      setEditorStatus('Select text and copy manually');
+  function weightedJudge(rates, rng) {
+    const total = Math.max(0.0001, Object.values(rates).reduce((a,b) => a + Math.max(0,b), 0));
+    let roll = rng() * total;
+    for (const judge of JUDGES) {
+      roll -= Math.max(0, rates[judge]);
+      if (roll <= 0) return judge;
     }
+    return 'Miss';
   }
 
-  function downloadText(filename, text) {
-    const blob = new Blob([text], { type: 'application/json;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+  function makeRng(seed) {
+    let t = seed >>> 0;
+    return () => {
+      t += 0x6D2B79F5;
+      let r = Math.imul(t ^ (t >>> 15), 1 | t);
+      r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+      return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+    };
   }
 
-  function downloadChartJson() {
-    updateExportText();
-    downloadText('chart.json', chartTextEl.value + '\n');
-    setEditorStatus('chart.json download started');
+  function simulateOnce(seed) {
+    const balance = readBalance();
+    const rates = rateValues();
+    const rng = makeRng(seed);
+    const notes = selectedDifficulty().notes;
+    const sim = {
+      score: 0, life: balance.startLife, combo: 0, maxCombo: 0, judged: 0, accWeight: 0,
+      counts: { Perfect: 0, Great: 0, Good: 0, Bad: 0, Miss: 0 },
+      failedAt: null,
+    };
+    for (let i = 0; i < notes.length; i++) {
+      const judge = weightedJudge(rates, rng);
+      const comboContinues = judge === 'Perfect' || judge === 'Great';
+      if (comboContinues) {
+        sim.combo += 1;
+        sim.maxCombo = Math.max(sim.maxCombo, sim.combo);
+      } else {
+        sim.combo = 0;
+      }
+      sim.score += balance.score[judge] + (comboContinues ? comboBonusFor(sim.combo, balance) : 0);
+      sim.life = Math.max(0, Math.min(balance.maxLife, sim.life + balance.life[judge]));
+      sim.judged += 1;
+      sim.accWeight += balance.weight[judge];
+      sim.counts[judge] += 1;
+      if (sim.life <= 0) {
+        sim.failedAt = i + 1;
+        break;
+      }
+    }
+    sim.clear = sim.failedAt === null;
+    sim.acc = sim.judged ? (sim.accWeight / sim.judged) * 100 : 100;
+    return sim;
   }
 
-  function downloadChartJs() {
-    const exported = buildExportChart();
-    const text = 'window.CHART = ' + JSON.stringify(exported) + ';\n';
-    downloadText('chart.js', text);
-    setEditorStatus('chart.js download started');
+  function runSimulation() {
+    updateRateTotal();
+    const trials = Math.max(10, Math.min(5000, Math.floor(num('simTrials', 500))));
+    const results = [];
+    for (let i = 0; i < trials; i++) results.push(simulateOnce(12345 + i * 97));
+    const clears = results.filter(r => r.clear);
+    const avg = (arr, fn) => arr.length ? arr.reduce((a, x) => a + fn(x), 0) / arr.length : 0;
+    const clearRate = clears.length / results.length * 100;
+    const avgScore = avg(results, r => r.score);
+    const avgAcc = avg(results, r => r.acc);
+    const avgMaxCombo = avg(results, r => r.maxCombo);
+    const failed = results.filter(r => !r.clear);
+    const avgFailAt = avg(failed, r => r.failedAt || selectedDifficulty().notes.length);
+    const noteCount = selectedDifficulty().notes.length;
+    const advice = clearRate >= 90 ? '관대한 편이라 초견 클리어용으로 좋아 보여.'
+      : clearRate >= 65 ? '적당히 긴장감 있는 난이도야. 기본값 후보로 꽤 좋아 보여.'
+      : clearRate >= 35 ? '실패가 자주 나와서 하드/챌린지 쪽에 가까워 보여.'
+      : '많이 빡빡해. 라이프 감소를 줄이거나 시작 라이프를 올리는 쪽이 좋아 보여.';
+    $('simResult').innerHTML = `
+      <div>클리어율 <span class="big">${clearRate.toFixed(1)}%</span> · ${trials}회 기준</div>
+      <div>평균 점수 <code>${Math.round(avgScore).toLocaleString()}</code> / 평균 Acc <code>${avgAcc.toFixed(2)}%</code> / 평균 Max Combo <code>${Math.round(avgMaxCombo)}</code></div>
+      <div>${failed.length ? `실패 시 평균 ${avgFailAt.toFixed(1)} / ${noteCount} 노트 지점에서 탈락` : '실패 케이스 없음'}</div>
+      <div class="sub small">${advice}</div>
+    `;
   }
 
-  function setEditorStatus(message) {
-    editorStatusEl.textContent = message;
+  function setRates(p, g, good, bad, miss) {
+    $('ratePerfect').value = p;
+    $('rateGreat').value = g;
+    $('rateGood').value = good;
+    $('rateBad').value = bad;
+    $('rateMiss').value = miss;
+    updateRateTotal();
+  }
+
+  function copyBalance() {
+    const text = JSON.stringify(readBalance(), null, 2);
+    navigator.clipboard?.writeText(text).then(() => {
+      $('simResult').innerHTML = '<div>설정 JSON을 클립보드에 복사했어.</div><pre>' + text.replace(/[<>&]/g, s => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[s])) + '</pre>';
+    }).catch(() => {
+      $('simResult').innerHTML = '<div>클립보드 복사가 막혔어. 아래 JSON을 직접 복사하면 돼.</div><pre>' + text.replace(/[<>&]/g, s => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[s])) + '</pre>';
+    });
   }
 
   document.addEventListener('keydown', (ev) => {
     if (ev.repeat) return;
     if (ev.code === 'Space') {
       ev.preventDefault();
-      if (!state.running && !state.recording) startGame();
-      else pauseGame();
+      if (!state.running) startGame(); else pauseGame();
       return;
     }
     const lane = keyToLane[ev.code];
@@ -576,56 +514,45 @@
   startBtn.addEventListener('click', startGame);
   pauseBtn.addEventListener('click', pauseGame);
   restartBtn.addEventListener('click', () => { resetGame(); startGame(); });
-  difficultyEl.addEventListener('change', () => {
-    if (!state.recording && !state.running) resetGame();
-    else rebuildStateNotes();
-    updateInfo();
-    updateExportText();
-  });
-  offsetEl.addEventListener('input', () => {
-    offsetLabel.textContent = offsetEl.value;
-  });
+  difficultyEl.addEventListener('change', () => { resetGame(); runSimulation(); });
+  offsetEl.addEventListener('input', () => { offsetLabel.textContent = offsetEl.value; });
 
-  recordStartBtn.addEventListener('click', () => startRecording(true));
-  recordHereBtn.addEventListener('click', () => startRecording(false));
-  stopRecordBtn.addEventListener('click', stopRecording);
-  playManualBtn.addEventListener('click', () => {
-    stopRecording();
-    difficultyEl.value = 'manual';
-    resetGame();
-    startGame();
+  $('resetBalanceBtn').addEventListener('click', () => { writeBalance(DEFAULT_BALANCE); resetGame(); runSimulation(); });
+  $('applyBalanceBtn').addEventListener('click', () => { resetGame(); $('simResult').innerHTML = '<div>현재 밸런스를 게임에 적용했어. Start를 누르면 새 규칙으로 시작해.</div>'; });
+  $('exportBalanceBtn').addEventListener('click', copyBalance);
+  $('runSimBtn').addEventListener('click', runSimulation);
+  $('presetEasyBtn').addEventListener('click', () => { setRates(70, 20, 6, 1, 3); runSimulation(); });
+  $('presetMidBtn').addEventListener('click', () => { setRates(55, 25, 10, 3, 7); runSimulation(); });
+  $('presetHardBtn').addEventListener('click', () => { setRates(35, 25, 18, 7, 15); runSimulation(); });
+  $('strictPresetBtn').addEventListener('click', () => {
+    writeBalance({ maxLife: 100, startLife: 70, comboStep: 10, comboBonus: 40,
+      score: { Perfect: 1000, Great: 650, Good: 300, Bad: 0, Miss: 0 },
+      life: { Perfect: 1, Great: 0, Good: -2, Bad: -8, Miss: -12 },
+      weight: { Perfect: 1, Great: 0.7, Good: 0.35, Bad: 0, Miss: 0 } });
+    resetGame(); runSimulation();
   });
-  undoNoteBtn.addEventListener('click', undoManualNote);
-  clearManualBtn.addEventListener('click', clearManualNotes);
-  recordOffsetEl.addEventListener('input', () => {
-    recordOffsetLabel.textContent = recordOffsetEl.value;
+  $('softPresetBtn').addEventListener('click', () => {
+    writeBalance({ maxLife: 100, startLife: 90, comboStep: 10, comboBonus: 50,
+      score: { Perfect: 1000, Great: 750, Good: 500, Bad: 0, Miss: 0 },
+      life: { Perfect: 2, Great: 1, Good: 0, Bad: -4, Miss: -7 },
+      weight: { Perfect: 1, Great: 0.75, Good: 0.5, Bad: 0, Miss: 0 } });
+    resetGame(); runSimulation();
   });
-  snapSelect.addEventListener('change', () => {
-    setEditorStatus(`Snap: ${snapSelect.options[snapSelect.selectedIndex].textContent}`);
-  });
-  copyChartBtn.addEventListener('click', copyChartJson);
-  downloadJsonBtn.addEventListener('click', downloadChartJson);
-  downloadJsBtn.addEventListener('click', downloadChartJs);
+  for (const id of ['ratePerfect','rateGreat','rateGood','rateBad','rateMiss','simTrials']) {
+    $(id).addEventListener('input', updateRateTotal);
+  }
+  document.querySelectorAll('.balance-panel input').forEach(input => input.addEventListener('change', updateHud));
 
   audio.addEventListener('ended', () => {
-    if (state.recording) {
-      state.recording = false;
-      state.paused = false;
-      state.lastJudge = 'Record End';
-      setEditorStatus('Recording ended');
-    } else {
-      state.running = false;
-      state.lastJudge = `Finished · Max ${state.maxCombo}`;
-    }
+    state.running = false;
+    state.lastJudge = `Finished · Max ${state.maxCombo}`;
     updateHud();
-    updateInfo();
-    updateExportText();
   });
   audio.addEventListener('loadedmetadata', updateInfo);
-  audio.addEventListener('timeupdate', () => {
-    if (state.recording) updateHud();
-  });
 
+  writeBalance(DEFAULT_BALANCE);
+  updateRateTotal();
   resetGame();
+  runSimulation();
   draw();
 })();
