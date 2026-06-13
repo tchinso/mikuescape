@@ -36,7 +36,7 @@
             this.ui = new ns.UIEngine();
             this.scene = new THREE.Scene();
             this.scene.background = P.sky;
-            this.scene.fog = new THREE.Fog(P.sky, 120, C.viewDistance);
+            this.scene.fog = new THREE.Fog(0xbfd9ff, 145, C.viewDistance * 0.94);
 
             this.camera = new THREE.PerspectiveCamera(64, this.viewportW / this.viewportH, 0.1, 1500);
 
@@ -51,11 +51,11 @@
             });
             this.renderer.setPixelRatio(this.renderDpr);
             this.renderer.setSize(this.viewportW, this.viewportH);
-            this.renderer.shadowMap.enabled = true;
+            this.renderer.shadowMap.enabled = false;
             this.renderer.shadowMap.type = Perf.shadowType;
             this.renderer.outputEncoding = THREE.sRGBEncoding;
             this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            this.renderer.toneMappingExposure = 1.08;
+            this.renderer.toneMappingExposure = 1.2;
             this.renderer.autoClear = false;
             document.body.appendChild(this.renderer.domElement);
 
@@ -180,15 +180,15 @@
         }
 
         setupLights() {
-            const ambient = new THREE.AmbientLight(0xffffff, 0.72);
+            const ambient = new THREE.AmbientLight(0xfff4df, 0.38);
             this.scene.add(ambient);
 
-            const hemi = new THREE.HemisphereLight(0xffffff, 0x7ab6c6, 0.52);
+            const hemi = new THREE.HemisphereLight(0xcfeaff, 0x6c4f7b, 0.82);
             hemi.position.set(0, 260, 0);
             this.scene.add(hemi);
 
-            const sun = new THREE.DirectionalLight(0xffffff, 1.18);
-            sun.position.set(-180, 330, 210);
+            const sun = new THREE.DirectionalLight(0xffedc5, 1.55);
+            sun.position.set(-210, 360, 250);
             sun.castShadow = true;
             sun.shadow.mapSize.width = Perf.shadowMapSize;
             sun.shadow.mapSize.height = Perf.shadowMapSize;
@@ -201,6 +201,18 @@
             sun.shadow.camera.far = 900;
             sun.shadow.bias = -0.00008;
             this.scene.add(sun);
+
+            const moon = new THREE.DirectionalLight(0x8db7ff, 0.48);
+            moon.position.set(280, 220, -260);
+            this.scene.add(moon);
+
+            const roseFill = new THREE.PointLight(0xff8bd6, 0.42, 460, 2);
+            roseFill.position.set(-120, 80, 40);
+            this.scene.add(roseFill);
+
+            const aquaFill = new THREE.PointLight(0x6eefff, 0.36, 520, 2);
+            aquaFill.position.set(210, 70, 130);
+            this.scene.add(aquaFill);
         }
 
         updateMinimapViewportCache() {

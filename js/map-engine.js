@@ -2,6 +2,7 @@
     const ns = window.RuruWorld = window.RuruWorld || {};
     const C = ns.Config;
     const P = ns.Palette;
+    const V = ns.FantasyVisuals;
 
     function hexCss(hex) {
         return `#${new THREE.Color(hex).getHexString()}`;
@@ -29,6 +30,9 @@
             this.places = [];
             this.waterMeshes = [];
             this.cloudGroup = null;
+            this.skyDome = null;
+            this.animated = [];
+            this.glowSprites = [];
             this.playerBoat = null;
             this.dockBoat = null;
             this.tmpVec = new THREE.Vector3();
@@ -42,6 +46,7 @@
             this.collision.reset();
             this.createMaterials();
             this.defineZones();
+            this.addSkyRealm();
             this.addSea();
             this.addBaseTerrain();
             this.addRoadsAndWaterways();
@@ -51,34 +56,49 @@
             this.addResidentialDistrict();
             this.addPortDistrict();
             this.addForestsAndEdges();
+            this.addFantasyDetails();
             this.addClouds();
             this.registerPlaces();
             return this;
         }
 
         createMaterials() {
-            this.materials.grass = this.paintedMaterial(P.grass, "grass");
-            this.materials.grassLight = this.paintedMaterial(P.grassLight, "grass-light");
-            this.materials.grassDark = this.paintedMaterial(P.grassDark, "grass-dark");
-            this.materials.forest = this.paintedMaterial(P.forest, "forest");
-            this.materials.cliff = this.paintedMaterial(P.cliff, "cliff");
-            this.materials.cliffShade = this.paintedMaterial(P.cliffShade, "cliff-shade");
-            this.materials.path = this.paintedMaterial(P.path, "path");
-            this.materials.stone = this.paintedMaterial(P.stone, "stone");
-            this.materials.stoneLight = this.paintedMaterial(P.stoneLight, "stone-light");
-            this.materials.whiteStone = this.paintedMaterial(P.whiteStone, "white-stone");
-            this.materials.brick = this.paintedMaterial(P.brick, "brick");
-            this.materials.brickDark = this.paintedMaterial(P.brickDark, "brick-dark");
-            this.materials.cream = this.paintedMaterial(P.cream, "cream");
-            this.materials.roofRed = this.paintedMaterial(P.roofRed, "roof-red");
-            this.materials.roofOrange = this.paintedMaterial(P.roofOrange, "roof-orange");
-            this.materials.roofYellow = this.paintedMaterial(P.roofYellow, "roof-yellow");
-            this.materials.roofGreen = this.paintedMaterial(P.roofGreen, "roof-green");
-            this.materials.roofBlue = this.paintedMaterial(P.roofBlue, "roof-blue");
-            this.materials.wood = this.paintedMaterial(P.wood, "wood");
-            this.materials.darkWood = this.paintedMaterial(P.darkWood, "dark-wood");
-            this.materials.gold = this.basicMaterial(P.gold);
-            this.materials.canvas = this.paintedMaterial(P.canvas, "canvas");
+            const textured = (hex, variant, name, options) => {
+                if (!V || !V.standardMaterial) return this.paintedMaterial(hex, name || variant);
+                return V.standardMaterial(name || variant, hex, variant, options || {});
+            };
+
+            this.materials.grass = textured(P.grass, "grass", "meadow-grass", { repeat: [8, 8], seed: 11, bumpScale: 0.035 });
+            this.materials.grassLight = textured(P.grassLight, "grass", "sunlit-meadow", { repeat: [7, 7], seed: 12, bumpScale: 0.03 });
+            this.materials.grassDark = textured(P.grassDark, "grass", "mossy-grass", { repeat: [6, 6], seed: 13, bumpScale: 0.04 });
+            this.materials.forest = textured(P.forest, "grass", "deep-forest", { repeat: [5, 5], seed: 14, bumpScale: 0.045 });
+            this.materials.cliff = textured(P.cliff, "stone", "sun-cliff", { repeat: [5, 3], seed: 21, bumpScale: 0.12 });
+            this.materials.cliffShade = textured(P.cliffShade, "stone", "shadow-cliff", { repeat: [4, 4], seed: 22, bumpScale: 0.14 });
+            this.materials.path = textured(P.path, "stone", "worn-path", { repeat: [5, 2], seed: 23, bumpScale: 0.06 });
+            this.materials.stone = textured(P.stone, "stone", "old-stone", { repeat: [3, 3], seed: 31, bumpScale: 0.09 });
+            this.materials.stoneLight = textured(P.stoneLight, "marble", "moon-marble", { repeat: [4, 4], seed: 32, bumpScale: 0.045, roughness: 0.66, flatShading: false });
+            this.materials.whiteStone = textured(P.whiteStone, "marble", "palace-stone", { repeat: [3, 3], seed: 33, bumpScale: 0.035, roughness: 0.58, flatShading: false });
+            this.materials.stoneDark = textured(P.stoneDark, "stone", "ancient-dark-stone", { repeat: [3, 3], seed: 34, bumpScale: 0.12 });
+            this.materials.brick = textured(P.brick, "brick", "rose-brick", { repeat: [3, 3], seed: 41, bumpScale: 0.1 });
+            this.materials.brickDark = textured(P.brickDark, "brick", "wine-brick", { repeat: [3, 3], seed: 42, bumpScale: 0.1 });
+            this.materials.cream = textured(P.cream, "stone", "warm-plaster", { repeat: [2, 2], seed: 51, bumpScale: 0.025, roughness: 0.8 });
+            this.materials.roofRed = textured(P.roofRed, "roof", "ruby-roof", { repeat: [4, 4], seed: 61, bumpScale: 0.08 });
+            this.materials.roofOrange = textured(P.roofOrange, "roof", "amber-roof", { repeat: [4, 4], seed: 62, bumpScale: 0.08 });
+            this.materials.roofYellow = textured(P.roofYellow, "roof", "sun-roof", { repeat: [4, 4], seed: 63, bumpScale: 0.08 });
+            this.materials.roofGreen = textured(P.roofGreen, "roof", "jade-roof", { repeat: [4, 4], seed: 64, bumpScale: 0.08 });
+            this.materials.roofBlue = textured(P.roofBlue, "roof", "sapphire-roof", { repeat: [4, 4], seed: 65, bumpScale: 0.08 });
+            this.materials.wood = textured(P.wood, "wood", "carved-wood", { repeat: [3, 3], seed: 71, bumpScale: 0.13 });
+            this.materials.darkWood = textured(P.darkWood, "wood", "dark-carved-wood", { repeat: [3, 3], seed: 72, bumpScale: 0.14 });
+            this.materials.canvas = textured(P.canvas, "cloth", "sail-cloth", { repeat: [2, 2], seed: 81, bumpScale: 0.035 });
+            this.materials.bannerBlue = textured(P.bannerBlue, "cloth", "royal-banner-blue", { repeat: [2, 2], seed: 82, bumpScale: 0.04 });
+            this.materials.bannerRose = textured(P.bannerRose, "cloth", "royal-banner-rose", { repeat: [2, 2], seed: 83, bumpScale: 0.04 });
+            this.materials.gold = new THREE.MeshStandardMaterial({
+                color: P.gold,
+                emissive: 0x47320c,
+                emissiveIntensity: 0.22,
+                roughness: 0.34,
+                metalness: 0.48
+            });
             this.materials.waterFlat = new THREE.MeshStandardMaterial({
                 color: P.water,
                 roughness: 0.55,
@@ -87,17 +107,45 @@
                 opacity: 0.72
             });
             this.materials.window = new THREE.MeshStandardMaterial({
-                color: 0x5fb4d7,
-                roughness: 0.28,
-                metalness: 0.05,
-                emissive: 0x11384a,
-                emissiveIntensity: 0.12
+                color: 0x80dfff,
+                roughness: 0.18,
+                metalness: 0.02,
+                emissive: 0x2269aa,
+                emissiveIntensity: 0.55,
+                transparent: true,
+                opacity: 0.86
             });
             this.materials.shadow = new THREE.MeshStandardMaterial({
                 color: 0x6f6049,
                 transparent: true,
                 opacity: 0.16,
                 roughness: 1
+            });
+            this.materials.crystal = new THREE.MeshStandardMaterial({
+                color: 0x8ef8ff,
+                emissive: 0x24b9ff,
+                emissiveIntensity: 0.92,
+                roughness: 0.14,
+                metalness: 0.05,
+                transparent: true,
+                opacity: 0.78,
+                flatShading: true
+            });
+            this.materials.crystalRose = new THREE.MeshStandardMaterial({
+                color: 0xff9dde,
+                emissive: 0xff4fc7,
+                emissiveIntensity: 0.72,
+                roughness: 0.18,
+                metalness: 0.04,
+                transparent: true,
+                opacity: 0.74,
+                flatShading: true
+            });
+            this.materials.lanternCore = new THREE.MeshBasicMaterial({
+                color: 0xfff1ac,
+                transparent: true,
+                opacity: 0.95,
+                toneMapped: false
             });
         }
 
@@ -215,6 +263,87 @@
                 { x: 186, z: 154, w: 170, d: 88 },
                 { x: 188, z: 108, w: 150, d: 70 }
             ];
+        }
+
+        addSkyRealm() {
+            const skyMat = new THREE.MeshBasicMaterial({
+                map: V && V.skyTexture ? V.skyTexture() : null,
+                color: V && V.skyTexture ? 0xffffff : P.sky,
+                side: THREE.BackSide,
+                fog: false
+            });
+            skyMat.toneMapped = false;
+            const sky = new THREE.Mesh(new THREE.SphereGeometry(920, 64, 36), skyMat);
+            sky.position.set(0, 62, 0);
+            sky.rotation.y = -0.36;
+            this.scene.add(sky);
+            this.skyDome = sky;
+
+            this.addCelestialSprite(-370, 245, -520, 190, "rgba(255,232,170,0.95)");
+            this.addCelestialSprite(330, 205, -390, 90, "rgba(139,219,255,0.75)");
+            this.addCelestialSprite(-210, 170, 460, 72, "rgba(255,150,224,0.62)");
+
+            this.addFloatingIsland(-260, 92, -430, 1.1, "blue");
+            this.addFloatingIsland(280, 84, -355, 0.86, "rose");
+            this.addFloatingIsland(80, 118, 415, 0.78, "gold");
+        }
+
+        addCelestialSprite(x, y, z, scale, color) {
+            if (!V || !V.glowSprite) return;
+            const mat = new THREE.SpriteMaterial({
+                map: V.glowSprite(color),
+                transparent: true,
+                opacity: 0.95,
+                depthWrite: false,
+                fog: false,
+                blending: THREE.AdditiveBlending,
+                toneMapped: false
+            });
+            const sprite = new THREE.Sprite(mat);
+            sprite.position.set(x, y, z);
+            sprite.scale.set(scale, scale, 1);
+            this.scene.add(sprite);
+            this.glowSprites.push({ sprite, baseScale: scale, baseOpacity: mat.opacity, pulse: 0.04, speed: 0.18 });
+        }
+
+        addFloatingIsland(x, y, z, scale, accent) {
+            const group = new THREE.Group();
+            group.position.set(x, y, z);
+            group.scale.setScalar(scale);
+
+            const rock = new THREE.Mesh(new THREE.ConeGeometry(28, 48, 7), this.materials.cliffShade);
+            rock.position.y = -18;
+            rock.rotation.y = 0.38;
+            group.add(rock);
+
+            const cap = new THREE.Mesh(new THREE.CylinderGeometry(31, 25, 8, 9), this.materials.grassDark);
+            cap.position.y = 8;
+            group.add(cap);
+
+            for (let i = 0; i < 4; i++) {
+                const a = (i / 4) * Math.PI * 2 + 0.2;
+                const tree = new THREE.Group();
+                const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.2, 9, 7), this.materials.darkWood);
+                trunk.position.y = 15;
+                tree.add(trunk);
+                const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(5.2, 1), this.materials.forest);
+                leaf.position.y = 22;
+                leaf.scale.y = 0.8;
+                tree.add(leaf);
+                tree.position.set(Math.cos(a) * 14, 0, Math.sin(a) * 11);
+                group.add(tree);
+            }
+
+            const crystalMat = accent === "rose" ? this.materials.crystalRose : this.materials.crystal;
+            const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(5.5, 0), crystalMat);
+            crystal.position.set(0, 17, 0);
+            crystal.scale.set(0.75, 1.9, 0.75);
+            group.add(crystal);
+
+            this.enableShadow(group);
+            this.scene.add(group);
+            this.animated.push({ kind: "float", obj: group, baseY: y, amp: 4 + scale * 2, speed: 0.22 + scale * 0.08 });
+            this.addGlowSprite(x, y + 18 * scale, z, 34 * scale, accent === "rose" ? "rgba(255,98,202,0.55)" : "rgba(94,238,255,0.55)", false);
         }
 
         heightAt(x, z) {
@@ -583,6 +712,219 @@
             }
         }
 
+        addFantasyDetails() {
+            this.addRuneCircle(-166, -102, 8.55, 23, 0x72f7e8, 0.42);
+            this.addRuneCircle(158, -145, 10.58, 20, 0xffd36f, 0.38);
+            this.addRuneCircle(-214, 54, 3.58, 17, 0x9cf8b8, 0.36);
+            this.addRuneCircle(28, 66, 5.58, 21, 0xff8ed8, 0.34);
+            this.addRuneCircle(184, 154, 3.38, 24, 0x74d8ff, 0.34);
+            this.addRuneCircle(-292, -224, this.heightAt(-292, -224) + 0.2, 15, 0xffb45d, 0.3);
+
+            this.addDistrictSign("루루 아카데미", -166, -65, 10.5, 0, 0x274f9e);
+            this.addDistrictSign("왕도 루미나", 158, -88, 12.8, Math.PI, 0xb9477a);
+            this.addDistrictSign("별빛 상점가", -214, 22, 6.1, 0.08, 0x4f9a6b);
+            this.addDistrictSign("달정원 마을", 24, 128, 8.0, Math.PI, 0xd77b3f);
+            this.addDistrictSign("하늘항구", 184, 198, 6.1, Math.PI, 0x3f70c8);
+
+            [
+                [-92, -122, 1.1, "blue"], [-38, -222, 1.35, "rose"], [-272, -52, 0.9, "gold"],
+                [142, -198, 1.05, "gold"], [236, -88, 0.95, "blue"], [82, -88, 0.8, "rose"],
+                [-188, 92, 0.85, "gold"], [-252, 70, 0.78, "blue"], [98, 102, 0.82, "rose"],
+                [118, 76, 0.78, "blue"], [122, 196, 0.9, "blue"], [252, 184, 0.95, "gold"]
+            ].forEach((c) => this.addCrystalCluster(c[0], c[1], c[2], c[3]));
+
+            [
+                [-238, -84, 8.5, 0x274f9e, 0.2, "A"], [-96, -82, 8.5, 0xb9477a, -0.2, "M"],
+                [112, -82, 11.8, 0xb9477a, 0.08, "L"], [206, -82, 11.8, 0x274f9e, -0.08, "R"],
+                [-294, 16, 4.8, 0x4f9a6b, 0.2, "S"], [-136, 22, 4.8, 0xd77b3f, -0.18, "G"],
+                [-42, 116, 7.0, 0xd77b3f, 0.1, "H"], [96, 32, 12.6, 0x274f9e, -0.22, "N"],
+                [112, 156, 5.4, 0x3f70c8, 0.18, "P"], [270, 154, 5.4, 0xb9477a, -0.18, "T"]
+            ].forEach((b) => this.addBanner(b[0], b[1], b[2], b[3], b[4], b[5]));
+
+            [
+                [-214, -70], [-166, -78], [-118, -76], [-44, -88], [36, -104], [74, -116],
+                [-214, 30], [-220, 78], [-72, 76], [8, 72], [72, 78], [130, 110],
+                [168, -24], [178, 52], [184, 104], [184, 156], [156, 194], [212, 194]
+            ].forEach((p, i) => this.addLantern(p[0], p[1], i % 3 === 0 ? 0x74eed9 : (i % 3 === 1 ? 0xffcc73 : 0xff7bd6)));
+
+            this.addFlowerMeadow(-166, -88, 124, 42, 42, [P.flowerPink, P.flowerBlue, P.roofYellow]);
+            this.addFlowerMeadow(-214, 78, 116, 54, 38, [P.roofYellow, P.flowerPink, P.grassLight]);
+            this.addFlowerMeadow(28, 104, 138, 64, 48, [P.flowerPink, P.flowerBlue, P.roofGreen]);
+            this.addFlowerMeadow(158, -176, 132, 60, 34, [P.roofYellow, P.flowerBlue, P.whiteStone]);
+
+            this.addWaterfallRibbon(-328, -214, -258, -172, 18, 0.52);
+            this.addWaterfallRibbon(272, 180, 318, 220, 12, 0.46);
+        }
+
+        rgbaFromHex(hex, alpha) {
+            const c = new THREE.Color(hex);
+            return `rgba(${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)},${alpha})`;
+        }
+
+        addRuneCircle(x, z, y, radius, color, opacity) {
+            if (!V || !V.runeTexture) return null;
+            const mat = new THREE.MeshBasicMaterial({
+                map: V.runeTexture(this.rgbaFromHex(color, 0.9), Math.floor(radius * 97 + x * 3 - z)),
+                transparent: true,
+                opacity: opacity || 0.36,
+                depthWrite: false,
+                side: THREE.DoubleSide,
+                blending: THREE.AdditiveBlending,
+                toneMapped: false
+            });
+            const mesh = new THREE.Mesh(new THREE.PlaneGeometry(radius * 2, radius * 2), mat);
+            mesh.position.set(x, y + 0.04, z);
+            mesh.rotation.x = -Math.PI / 2;
+            mesh.renderOrder = 3;
+            this.scene.add(mesh);
+            this.animated.push({ kind: "rune", obj: mesh, speed: 0.025 + radius * 0.001, baseOpacity: mat.opacity });
+            return mesh;
+        }
+
+        addGlowSprite(x, y, z, scale, color, track) {
+            if (!V || !V.glowSprite) return null;
+            const mat = new THREE.SpriteMaterial({
+                map: V.glowSprite(color),
+                transparent: true,
+                opacity: 0.9,
+                depthWrite: false,
+                fog: false,
+                blending: THREE.AdditiveBlending,
+                toneMapped: false
+            });
+            const sprite = new THREE.Sprite(mat);
+            sprite.position.set(x, y, z);
+            sprite.scale.set(scale, scale, 1);
+            this.scene.add(sprite);
+            if (track !== false) {
+                this.glowSprites.push({ sprite, baseScale: scale, baseOpacity: mat.opacity, pulse: 0.12, speed: 0.8 + this.rng() * 0.7 });
+            }
+            return sprite;
+        }
+
+        addCrystalCluster(x, z, scale, tone) {
+            const y = this.heightAt(x, z);
+            const group = new THREE.Group();
+            group.position.set(x, y, z);
+            const mat = tone === "rose" ? this.materials.crystalRose : this.materials.crystal;
+            const count = 4 + Math.floor(this.rng() * 3);
+            for (let i = 0; i < count; i++) {
+                const a = (i / count) * Math.PI * 2 + this.rng() * 0.4;
+                const r = (1.6 + this.rng() * 4.5) * scale;
+                const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(2.4 + this.rng() * 1.8, 0), mat);
+                crystal.position.set(Math.cos(a) * r, 2.4 * scale, Math.sin(a) * r);
+                crystal.scale.set(0.55 * scale, (1.6 + this.rng() * 1.4) * scale, 0.55 * scale);
+                crystal.rotation.set(this.rng() * 0.25, this.rng() * Math.PI, this.rng() * 0.25);
+                group.add(crystal);
+            }
+            this.enableShadow(group);
+            this.scene.add(group);
+            const color = tone === "rose" ? "rgba(255,92,202,0.58)" : tone === "gold" ? "rgba(255,207,104,0.55)" : "rgba(96,235,255,0.55)";
+            this.addGlowSprite(x, y + 5.6 * scale, z, 13 * scale, color);
+            if (scale > 1.2) {
+                const light = new THREE.PointLight(tone === "rose" ? 0xff68ce : tone === "gold" ? 0xffcf75 : 0x65eaff, 0.75, 56, 2);
+                light.position.set(x, y + 8 * scale, z);
+                this.scene.add(light);
+                this.animated.push({ kind: "light", obj: light, baseIntensity: 0.75, speed: 1.2 + this.rng() });
+            }
+            this.animated.push({ kind: "spin", obj: group, speed: 0.03 + this.rng() * 0.03 });
+        }
+
+        addLantern(x, z, color) {
+            const y = this.heightAt(x, z);
+            const post = this.addCylinder(0.35, 0.45, 9, this.materials.darkWood, x, y + 4.5, z, 8);
+            const arm = this.addBox(5.5, 0.35, 0.35, this.materials.darkWood, x + 1.8, y + 8.4, z, 0);
+            const lamp = this.addSphere(1.15, this.materials.lanternCore, x + 4.4, y + 7.7, z, 0.88);
+            const c = this.rgbaFromHex(color, 0.86);
+            this.addGlowSprite(x + 4.4, y + 7.7, z, 10, c);
+            lamp.castShadow = false;
+        }
+
+        addBanner(x, z, y, color, rotY, crest) {
+            if (!V || !V.bannerTexture) return;
+            const group = new THREE.Group();
+            group.position.set(x, y, z);
+            group.rotation.y = rotY || 0;
+            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, 13, 8), this.materials.darkWood);
+            pole.position.y = 6.5;
+            group.add(pole);
+            const bar = new THREE.Mesh(new THREE.BoxGeometry(6, 0.45, 0.45), this.materials.gold);
+            bar.position.set(2.4, 12.4, 0);
+            group.add(bar);
+            const mat = new THREE.MeshBasicMaterial({
+                map: V.bannerTexture(color, crest),
+                transparent: true,
+                side: THREE.DoubleSide,
+                alphaTest: 0.03,
+                toneMapped: false
+            });
+            const banner = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 8.7), mat);
+            banner.position.set(2.4, 8.0, 0.08);
+            group.add(banner);
+            this.enableShadow(group);
+            this.scene.add(group);
+            this.animated.push({ kind: "sway", obj: banner, baseRot: 0, speed: 0.9 + this.rng() * 0.6, amp: 0.045 });
+        }
+
+        addDistrictSign(text, x, z, y, rotY, color) {
+            if (!V || !V.signTexture) return;
+            const group = new THREE.Group();
+            group.position.set(x, y, z);
+            group.rotation.y = rotY || 0;
+            const tex = V.signTexture(text, {
+                bg: V.colorCss(color),
+                fg: "#ffe9b8",
+                glow: this.rgbaFromHex(color === 0x4f9a6b ? 0x7af5ae : color, 0.95)
+            });
+            const mat = new THREE.MeshBasicMaterial({
+                map: tex,
+                transparent: true,
+                side: THREE.DoubleSide,
+                toneMapped: false
+            });
+            const sign = new THREE.Mesh(new THREE.PlaneGeometry(22, 6.8), mat);
+            sign.position.y = 7.2;
+            group.add(sign);
+            const left = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.75, 10, 8), this.materials.darkWood);
+            left.position.set(-10, 4.4, -0.15);
+            const right = left.clone();
+            right.position.x = 10;
+            group.add(left, right);
+            this.enableShadow(group);
+            this.scene.add(group);
+            this.addGlowSprite(x, y + 7.4, z, 18, this.rgbaFromHex(color, 0.22));
+        }
+
+        addFlowerMeadow(cx, cz, w, d, count, colors) {
+            const mats = colors.map((c) => this.basicMaterial(c));
+            for (let i = 0; i < count; i++) {
+                const x = cx + (this.rng() - 0.5) * w;
+                const z = cz + (this.rng() - 0.5) * d;
+                if (this.isSea(x, z)) continue;
+                const y = this.heightAt(x, z);
+                const mat = mats[i % mats.length];
+                const stem = this.addCylinder(0.08, 0.1, 0.9, this.materials.grassDark, x, y + 0.45, z, 5);
+                stem.castShadow = false;
+                stem.receiveShadow = false;
+                const bloom = this.addSphere(0.55 + this.rng() * 0.35, mat, x, y + 1.05, z, 0.35);
+                bloom.castShadow = false;
+                bloom.receiveShadow = false;
+            }
+        }
+
+        addWaterfallRibbon(x1, z1, x2, z2, width, opacity) {
+            const mat = new THREE.MeshBasicMaterial({
+                color: 0xdffcff,
+                transparent: true,
+                opacity: opacity || 0.45,
+                depthWrite: false,
+                side: THREE.DoubleSide,
+                blending: THREE.AdditiveBlending
+            });
+            const mesh = this.createRibbon([[x1, z1], [(x1 + x2) / 2, (z1 + z2) / 2], [x2, z2]], width, mat, { constantY: C.waterLevel + 0.42 });
+            this.animated.push({ kind: "water-ribbon", obj: mesh, baseOpacity: mat.opacity, speed: 1.3 + this.rng() });
+        }
+
         registerPlaces() {
             this.places = [
                 {
@@ -707,6 +1049,37 @@
                 if (mesh.material && mesh.material.uniforms && mesh.material.uniforms.time) {
                     mesh.material.uniforms.time.value = time;
                 }
+            }
+
+            if (this.skyDome) {
+                this.skyDome.rotation.y = -0.36 + time * 0.006;
+            }
+
+            for (let i = 0; i < this.animated.length; i++) {
+                const item = this.animated[i];
+                if (!item || !item.obj) continue;
+                if (item.kind === "rune") {
+                    item.obj.rotation.z += item.speed;
+                    if (item.obj.material) item.obj.material.opacity = item.baseOpacity * (0.78 + Math.sin(time * 1.8 + i) * 0.18);
+                } else if (item.kind === "float") {
+                    item.obj.position.y = item.baseY + Math.sin(time * item.speed + i) * item.amp;
+                    item.obj.rotation.y += 0.0025;
+                } else if (item.kind === "spin") {
+                    item.obj.rotation.y += item.speed;
+                } else if (item.kind === "sway") {
+                    item.obj.rotation.y = item.baseRot + Math.sin(time * item.speed + i) * item.amp;
+                } else if (item.kind === "light") {
+                    item.obj.intensity = item.baseIntensity * (0.76 + Math.sin(time * item.speed + i) * 0.18);
+                } else if (item.kind === "water-ribbon" && item.obj.material) {
+                    item.obj.material.opacity = item.baseOpacity * (0.78 + Math.sin(time * item.speed + i) * 0.14);
+                }
+            }
+
+            for (let i = 0; i < this.glowSprites.length; i++) {
+                const item = this.glowSprites[i];
+                const pulse = 1 + Math.sin(time * item.speed + i) * item.pulse;
+                item.sprite.scale.set(item.baseScale * pulse, item.baseScale * pulse, 1);
+                if (item.sprite.material) item.sprite.material.opacity = item.baseOpacity * (0.84 + Math.sin(time * item.speed + i) * 0.12);
             }
 
             if (this.cloudGroup) {
@@ -899,26 +1272,45 @@
             group.position.set(x, y, z);
             group.rotation.y = opts.rot || 0;
 
+            const plinth = new THREE.Mesh(new THREE.BoxGeometry(w + 2.2, 1.3, d + 2.2), this.materials.stone);
+            plinth.position.y = 0.65;
+            group.add(plinth);
+
             const base = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wall);
-            base.position.y = h / 2;
+            base.position.y = h / 2 + 0.8;
             group.add(base);
 
             const roof = new THREE.Mesh(this.makeRoofGeometry(w + 4, d + 4, 6), roofMat);
-            roof.position.y = h;
+            roof.position.y = h + 0.8;
             group.add(roof);
 
+            const ridge = new THREE.Mesh(new THREE.BoxGeometry(w + 5, 0.55, 0.7), this.materials.gold);
+            ridge.position.set(0, h + 6.8, 0);
+            group.add(ridge);
+
             const door = new THREE.Mesh(new THREE.BoxGeometry(4.2, 6, 0.55), this.materials.darkWood);
-            door.position.set(0, 3, -d / 2 - 0.28);
+            door.position.set(0, 3.8, -d / 2 - 0.28);
             group.add(door);
+            const knob = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 6), this.materials.gold);
+            knob.position.set(1.25, 3.9, -d / 2 - 0.66);
+            group.add(knob);
 
             for (let i = -1; i <= 1; i += 2) {
                 const windowMesh = new THREE.Mesh(new THREE.BoxGeometry(3.4, 3, 0.45), this.materials.window);
-                windowMesh.position.set(i * w * 0.28, 6.2, -d / 2 - 0.3);
+                windowMesh.position.set(i * w * 0.28, 7.0, -d / 2 - 0.3);
                 group.add(windowMesh);
+                const frameH = new THREE.Mesh(new THREE.BoxGeometry(4.1, 0.35, 0.62), this.materials.gold);
+                frameH.position.set(i * w * 0.28, 8.75, -d / 2 - 0.62);
+                group.add(frameH);
+                const frameL = new THREE.Mesh(new THREE.BoxGeometry(0.35, 3.6, 0.62), this.materials.gold);
+                frameL.position.set(i * w * 0.28 - 1.9, 7.0, -d / 2 - 0.62);
+                const frameR = frameL.clone();
+                frameR.position.x = i * w * 0.28 + 1.9;
+                group.add(frameL, frameR);
             }
 
             const chimney = new THREE.Mesh(new THREE.BoxGeometry(2.5, 5, 2.5), this.materials.brickDark);
-            chimney.position.set(w * 0.25, h + 4, 1);
+            chimney.position.set(w * 0.25, h + 4.8, 1);
             group.add(chimney);
 
             if (opts.awning) {
@@ -993,10 +1385,22 @@
             const towerRoof = new THREE.Mesh(new THREE.ConeGeometry(13, 22, 6), this.materials.roofBlue);
             towerRoof.position.set(0, 53, -2);
             group.add(towerRoof);
+            const towerCrystal = new THREE.Mesh(new THREE.OctahedronGeometry(4.5, 0), this.materials.crystal);
+            towerCrystal.position.set(0, 67, -2);
+            towerCrystal.scale.set(0.7, 1.8, 0.7);
+            group.add(towerCrystal);
             const clock = new THREE.Mesh(new THREE.CylinderGeometry(4.8, 4.8, 0.6, 24), this.materials.canvas);
             clock.position.set(0, 36, -11.2);
             clock.rotation.x = Math.PI / 2;
             group.add(clock);
+            const roseWindow = new THREE.Mesh(new THREE.CylinderGeometry(6.2, 6.2, 0.55, 32), this.materials.window);
+            roseWindow.position.set(0, 23, -17.7);
+            roseWindow.rotation.x = Math.PI / 2;
+            group.add(roseWindow);
+            const roseTrim = new THREE.Mesh(new THREE.TorusGeometry(6.35, 0.28, 8, 28), this.materials.gold);
+            roseTrim.position.copy(roseWindow.position);
+            roseTrim.rotation.x = Math.PI / 2;
+            group.add(roseTrim);
 
             for (let i = -1; i <= 1; i++) {
                 for (let j = 0; j < 2; j++) {
@@ -1017,6 +1421,11 @@
 
             this.enableShadow(group);
             this.scene.add(group);
+            this.addGlowSprite(x, y + 68, z - 2, 24, "rgba(96,235,255,0.42)");
+            const light = new THREE.PointLight(0x7ff5ff, 0.85, 86, 2);
+            light.position.set(x, y + 52, z - 12);
+            this.scene.add(light);
+            this.animated.push({ kind: "light", obj: light, baseIntensity: 0.85, speed: 0.9 });
             this.collision.addObstacle(x, z, 42);
         }
 
@@ -1117,14 +1526,26 @@
                 const cone = new THREE.Mesh(new THREE.ConeGeometry(11, 18, 16), this.materials.roofBlue);
                 cone.position.set(i * 42, 47, -1);
                 group.add(cone);
+                const crown = new THREE.Mesh(new THREE.OctahedronGeometry(3.5, 0), i > 0 ? this.materials.crystalRose : this.materials.crystal);
+                crown.position.set(i * 42, 59, -1);
+                crown.scale.set(0.6, 1.65, 0.6);
+                group.add(crown);
             }
             for (let i = -2; i <= 2; i++) {
                 const col = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.4, 15, 10), this.materials.stone);
                 col.position.set(i * 9, 8, -18.3);
                 group.add(col);
             }
+            const balcony = new THREE.Mesh(new THREE.BoxGeometry(60, 2.2, 5), this.materials.gold);
+            balcony.position.set(0, 19, -20.4);
+            group.add(balcony);
+            const roseWindow = new THREE.Mesh(new THREE.CylinderGeometry(7, 7, 0.55, 32), this.materials.window);
+            roseWindow.position.set(0, 20, -17.5);
+            roseWindow.rotation.x = Math.PI / 2;
+            group.add(roseWindow);
             this.enableShadow(group);
             this.scene.add(group);
+            this.addGlowSprite(x, y + 60, z - 1, 30, "rgba(255,113,210,0.32)");
             this.collision.addObstacle(x, z, 42);
         }
 
@@ -1424,6 +1845,124 @@
             this.scene.add(this.cloudGroup);
         }
     }
+
+    MapEngine.prototype.registerPlaces = function () {
+        this.places = [
+            {
+                id: "school", label: "아카데미 메뉴", title: "루루 아카데미",
+                x: -166, z: -112, radius: 98, zoneRadius: 104,
+                body: "별빛 룬과 오래된 강의동이 이어진 마법 학교입니다. 중앙 광장에는 항해술과 고대 유적 연구 기록이 모여 있습니다.",
+                items: ["수업 게시판", "기숙사", "연구동", "훈련장"]
+            },
+            {
+                id: "capital", label: "왕도 메뉴", title: "왕도 루미나",
+                x: 158, z: -145, radius: 110, zoneRadius: 112,
+                body: "하얀 성벽과 푸른 첨탑이 빛나는 수도입니다. 왕궁 광장과 관리 사무소, 기사단 본부가 자리합니다.",
+                items: ["왕궁 알현", "광장 게시판", "관리 사무소"]
+            },
+            {
+                id: "shopping", label: "상점가 메뉴", title: "별빛 상점가",
+                x: -214, z: 54, radius: 98, zoneRadius: 98,
+                body: "비단 천막과 룬 간판이 줄지어 선 시장입니다. 물약, 빵, 장비, 항해 도구를 살펴볼 수 있습니다.",
+                items: ["물약점", "빵집", "장비 상점", "수정 노점"]
+            },
+            {
+                id: "residential", label: "마을 메뉴", title: "달정원 마을",
+                x: 28, z: 66, radius: 104, zoneRadius: 104,
+                body: "꽃밭과 공동 마당을 중심으로 계단식 집들이 이어진 조용한 거주지입니다.",
+                items: ["주민 인사", "공동 마당", "마을 기록"]
+            },
+            {
+                id: "port", label: "항구 메뉴", title: "하늘항구",
+                x: 182, z: 164, radius: 112, zoneRadius: 112,
+                body: "목조 부두와 무역 창고가 모인 바다 출입구입니다. 작은 돛단배를 빌려 외해로 나갈 수 있습니다.",
+                items: ["돛단배", "무역소", "선원 노점"]
+            }
+        ];
+
+        this.places.forEach((place) => this.collision.addInteraction(place));
+    };
+
+    MapEngine.prototype.getLocation = function (x, z, state) {
+        if (state && state.onBoat && this.isSea(x, z)) return "바다";
+        if (this.isSea(x, z)) return "바다";
+
+        for (let i = 0; i < this.places.length; i++) {
+            const place = this.places[i];
+            const dx = x - place.x;
+            const dz = z - place.z;
+            if (dx * dx + dz * dz < place.zoneRadius * place.zoneRadius) {
+                return place.title;
+            }
+        }
+        return "필드";
+    };
+
+    MapEngine.prototype.handleInteraction = function (item, state, ui) {
+        if (!item) return null;
+
+        if (item.id === "port") {
+            if (state.onBoat) {
+                state.hasBoat = false;
+                state.onBoat = false;
+                state.boatDock = null;
+                ui.setBoatStatus("미보유");
+                ui.showDialog({
+                    title: "하늘항구",
+                    body: "돛단배를 항구에 반납하고 부두로 돌아왔습니다. 필요하면 다시 항구에서 빌릴 수 있습니다.",
+                    items: ["돛단배 반납", "정박 완료", "항구 거리"]
+                });
+                return { moveTo: this.portLanding, mode: "land" };
+            }
+
+            if (!state.hasBoat) {
+                state.hasBoat = true;
+                state.onBoat = true;
+                state.boatDock = null;
+                ui.setBoatStatus("승선 중");
+                ui.showDialog({
+                    title: "하늘항구",
+                    body: "항구 관리인이 작은 돛단배를 내어주었습니다. 이제 바다 위로 이동할 수 있습니다.",
+                    items: ["작은 돛단배 획득", "출항 준비", "바다 진입 허용"]
+                });
+                return { moveTo: this.boatSpawn, mode: "boat" };
+            }
+
+            if (this.isBoatDockedAtPort(state)) {
+                state.hasBoat = false;
+                state.boatDock = null;
+                ui.setBoatStatus("미보유");
+                ui.showDialog({
+                    title: "하늘항구",
+                    body: "정박해 둔 돛단배를 항구에 반납했습니다. 항구에서 다시 대여할 수 있습니다.",
+                    items: ["돛단배 반납", "대여 가능", "항구 거리"]
+                });
+                return null;
+            }
+
+            ui.showDialog({
+                title: "하늘항구",
+                body: "빌린 돛단배가 다른 해안에 정박해 있습니다. 정박한 곳으로 돌아가 배를 몰고 항구까지 가져와야 반납할 수 있습니다.",
+                items: ["추가 대여 불가", "정박 위치 확인", "항구 반납 필요"]
+            });
+            return null;
+        }
+
+        ui.showDialog({
+            title: item.title,
+            body: item.body,
+            items: item.items
+        });
+        return null;
+    };
+
+    MapEngine.prototype.showSeaDialog = function (ui) {
+        ui.showDialog({
+            title: "바다",
+            body: "돛단배에 탄 상태로만 접근할 수 있는 외해입니다. 물결과 항구 주변 항로를 확인할 수 있습니다.",
+            items: ["외해 탐색", "낚시 메뉴", "항구 복귀"]
+        });
+    };
 
     ns.MapEngine = MapEngine;
 })();

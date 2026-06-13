@@ -3,15 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>루루 월드 - 디오라마 맵</title>
+    <title>루루 월드 - 별빛 왕국의 항해</title>
     <style>
         :root {
-            color-scheme: light;
-            --ink: #2f3c44;
-            --paper: rgba(255, 252, 239, 0.88);
-            --line: rgba(111, 101, 82, 0.25);
-            --accent: #36aaa0;
-            --gold: #d89c2b;
+            color-scheme: dark;
+            --ink: #f7ecce;
+            --muted: rgba(247, 236, 206, 0.7);
+            --panel: rgba(16, 22, 43, 0.72);
+            --line: rgba(255, 224, 158, 0.32);
+            --accent: #74eed9;
+            --rose: #ff7ac8;
+            --gold: #e7bc5c;
         }
 
         html,
@@ -23,13 +25,24 @@
         body {
             margin: 0;
             overflow: hidden;
-            background: #9ed8e8;
-            font-family: "Segoe UI", "Malgun Gothic", Arial, sans-serif;
+            background: #0f1835;
+            font-family: "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
             user-select: none;
         }
 
         canvas {
             display: block;
+        }
+
+        #screen-effects {
+            position: fixed;
+            inset: 0;
+            z-index: 6;
+            pointer-events: none;
+            background:
+                linear-gradient(180deg, rgba(255, 232, 172, 0.08), rgba(116, 238, 217, 0.03) 45%, rgba(17, 20, 46, 0.18)),
+                radial-gradient(ellipse at center, rgba(255, 255, 255, 0) 48%, rgba(6, 9, 24, 0.34) 100%);
+            mix-blend-mode: soft-light;
         }
 
         #ui-layer {
@@ -59,12 +72,12 @@
 
         .hud-box {
             min-height: 34px;
-            padding: 8px 12px;
+            padding: 9px 13px;
             border-radius: 8px;
             color: var(--ink);
-            background: var(--paper);
-            border: 1px solid rgba(255, 255, 255, 0.68);
-            box-shadow: 0 8px 18px rgba(68, 94, 101, 0.12);
+            background: linear-gradient(180deg, rgba(27, 36, 72, 0.76), rgba(12, 17, 37, 0.7));
+            border: 1px solid var(--line);
+            box-shadow: 0 10px 28px rgba(5, 10, 28, 0.28), inset 0 1px 0 rgba(255, 244, 206, 0.18);
             font-weight: 800;
             line-height: 1.2;
             backdrop-filter: blur(10px);
@@ -73,24 +86,25 @@
         .hud-box small {
             display: block;
             margin-bottom: 2px;
-            color: rgba(47, 60, 68, 0.62);
+            color: rgba(116, 238, 217, 0.76);
             font-size: 11px;
             font-weight: 900;
             letter-spacing: 0.08em;
         }
 
         #gold-display {
-            color: #946516;
+            color: #ffe29c;
+            text-shadow: 0 0 12px rgba(231, 188, 92, 0.42);
         }
 
         #minimap-container {
             width: 172px;
             height: 172px;
             border-radius: 50%;
-            border: 5px solid rgba(255, 255, 255, 0.82);
-            box-shadow: 0 12px 28px rgba(45, 82, 92, 0.18);
+            border: 5px solid rgba(255, 224, 158, 0.72);
+            box-shadow: 0 12px 32px rgba(5, 10, 28, 0.34), inset 0 0 24px rgba(116, 238, 217, 0.18);
             position: relative;
-            background: rgba(255, 255, 255, 0.16);
+            background: rgba(9, 18, 42, 0.28);
             overflow: hidden;
             flex: 0 0 auto;
         }
@@ -103,9 +117,10 @@
             height: 0;
             border-left: 8px solid transparent;
             border-right: 8px solid transparent;
-            border-bottom: 15px solid #f45f5d;
+            border-bottom: 15px solid var(--rose);
             transform: translate(-50%, -50%);
             z-index: 2;
+            filter: drop-shadow(0 0 8px rgba(255, 122, 200, 0.8));
         }
 
         #crosshair {
@@ -114,10 +129,10 @@
             left: 50%;
             width: 7px;
             height: 7px;
-            background: rgba(255, 255, 255, 0.94);
+            background: rgba(255, 242, 184, 0.95);
             border-radius: 50%;
             transform: translate(-50%, -50%);
-            box-shadow: 0 0 0 2px rgba(42, 64, 70, 0.14);
+            box-shadow: 0 0 0 2px rgba(116, 238, 217, 0.32), 0 0 14px rgba(116, 238, 217, 0.62);
         }
 
         #interaction-prompt,
@@ -126,10 +141,10 @@
             left: 50%;
             transform: translateX(-50%);
             color: var(--ink);
-            background: rgba(255, 252, 239, 0.92);
+            background: rgba(16, 22, 43, 0.82);
             border: 1px solid var(--line);
             border-radius: 8px;
-            box-shadow: 0 10px 24px rgba(45, 82, 92, 0.14);
+            box-shadow: 0 14px 32px rgba(5, 10, 28, 0.34), inset 0 1px 0 rgba(255, 244, 206, 0.16);
             backdrop-filter: blur(10px);
             font-weight: 850;
             opacity: 0;
@@ -178,15 +193,16 @@
         .dialog-panel {
             padding: 16px 18px;
             border-radius: 8px;
-            background: rgba(255, 252, 239, 0.94);
-            border: 1px solid rgba(111, 101, 82, 0.22);
-            box-shadow: 0 18px 38px rgba(45, 82, 92, 0.18);
+            background: linear-gradient(180deg, rgba(28, 34, 65, 0.9), rgba(13, 18, 38, 0.9));
+            border: 1px solid rgba(255, 224, 158, 0.38);
+            box-shadow: 0 20px 46px rgba(4, 8, 22, 0.48), inset 0 1px 0 rgba(255, 244, 206, 0.14);
             color: var(--ink);
             backdrop-filter: blur(12px);
         }
 
         #dialog-title {
             margin: 0 0 8px;
+            color: #ffe29c;
             font-size: 22px;
             letter-spacing: 0;
         }
@@ -195,7 +211,7 @@
             margin: 0 0 12px;
             line-height: 1.55;
             font-weight: 650;
-            color: rgba(47, 60, 68, 0.84);
+            color: rgba(247, 236, 206, 0.84);
         }
 
         #dialog-menu {
@@ -211,8 +227,8 @@
             min-height: 34px;
             padding: 8px 10px;
             border-radius: 8px;
-            background: rgba(74, 167, 151, 0.1);
-            border: 1px solid rgba(74, 167, 151, 0.18);
+            background: rgba(116, 238, 217, 0.1);
+            border: 1px solid rgba(116, 238, 217, 0.24);
             font-size: 13px;
             font-weight: 850;
             display: flex;
@@ -231,10 +247,10 @@
         .avatar-diamond {
             width: 54px;
             height: 54px;
-            background: #f45f5d;
-            border: 4px solid #fff;
+            background: linear-gradient(135deg, var(--rose), var(--accent));
+            border: 4px solid rgba(255, 238, 184, 0.9);
             transform: rotate(45deg);
-            box-shadow: 5px 5px 0 rgba(62, 84, 89, 0.12);
+            box-shadow: 0 0 24px rgba(255, 122, 200, 0.35), 5px 5px 0 rgba(5, 10, 28, 0.24);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -245,7 +261,8 @@
             transform: rotate(-45deg);
             font-size: 22px;
             font-weight: 950;
-            color: #fff;
+            color: white;
+            text-shadow: 0 0 12px rgba(255, 255, 255, 0.7);
         }
 
         .bars {
@@ -257,9 +274,9 @@
 
         .bar-container {
             height: 14px;
-            background: rgba(255, 255, 255, 0.56);
-            border: 2px solid #fff;
-            box-shadow: 2px 2px 0 rgba(62, 84, 89, 0.12);
+            background: rgba(10, 16, 35, 0.64);
+            border: 2px solid rgba(255, 224, 158, 0.72);
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.34);
             overflow: hidden;
         }
 
@@ -269,19 +286,21 @@
         }
 
         #hp-bar {
-            background: #f45f5d;
+            background: linear-gradient(90deg, #ff5d8e, #ffb066);
             width: 100%;
         }
 
         #stamina-bar {
-            background: #36aaa0;
+            background: linear-gradient(90deg, var(--accent), #77b8ff);
             width: 100%;
         }
 
         #pause-menu {
             position: fixed;
             inset: 0;
-            background: rgba(238, 250, 253, 0.92);
+            background:
+                linear-gradient(180deg, rgba(15, 24, 53, 0.52), rgba(10, 12, 28, 0.88)),
+                radial-gradient(ellipse at 50% 20%, rgba(116, 238, 217, 0.2), rgba(13, 18, 38, 0.12) 48%, rgba(4, 7, 18, 0.8));
             backdrop-filter: blur(14px);
             display: flex;
             flex-direction: column;
@@ -297,17 +316,19 @@
 
         #pause-menu h1 {
             margin: 0;
-            color: #f45f5d;
+            color: #ffe29c;
             font-size: clamp(42px, 8vw, 78px);
             letter-spacing: 0;
             line-height: 1;
+            text-shadow: 0 0 34px rgba(231, 188, 92, 0.42), 0 4px 18px rgba(0, 0, 0, 0.42);
         }
 
         #pause-menu p {
             margin: 12px 0 0;
-            color: #36aaa0;
+            color: var(--accent);
             font-size: 18px;
             font-weight: 900;
+            text-shadow: 0 0 18px rgba(116, 238, 217, 0.42);
         }
 
         button {
@@ -315,12 +336,12 @@
             padding: 15px 42px;
             border: 0;
             border-radius: 8px;
-            background: #36aaa0;
-            color: #fff;
+            background: linear-gradient(180deg, #ffe29c, #d79b3d);
+            color: #18213e;
             cursor: pointer;
             font-size: 19px;
             font-weight: 950;
-            box-shadow: 0 10px 24px rgba(54, 170, 160, 0.28);
+            box-shadow: 0 0 28px rgba(231, 188, 92, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.48);
         }
 
         button:hover {
@@ -329,22 +350,10 @@
 
         .key-hint {
             margin-top: 22px;
-            color: rgba(47, 60, 68, 0.72);
+            color: var(--muted);
             font-size: 14px;
-            line-height: 2.1;
+            line-height: 1.7;
             font-weight: 750;
-        }
-
-        kbd {
-            background: white;
-            color: #40515a;
-            padding: 4px 8px;
-            border-radius: 6px;
-            box-shadow: 0 2px 0 #d8d6ca;
-            font-family: "Segoe UI", Consolas, monospace;
-            font-weight: 900;
-            margin: 0 3px;
-            border: 1px solid #efeadb;
         }
 
         #fps-hud {
@@ -353,8 +362,8 @@
             bottom: 12px;
             padding: 6px 9px;
             border-radius: 8px;
-            background: rgba(31, 44, 49, 0.36);
-            color: rgba(255, 255, 255, 0.95);
+            background: rgba(8, 13, 30, 0.46);
+            color: rgba(255, 239, 194, 0.95);
             font-family: Consolas, "Liberation Mono", monospace;
             font-size: 12px;
             z-index: 90;
@@ -393,13 +402,15 @@
     </style>
 </head>
 <body>
+    <div id="screen-effects"></div>
+
     <div id="ui-layer">
         <div id="fps-hud">-- FPS</div>
         <div id="top-bar">
             <div class="hud-stack">
                 <div class="hud-box">
                     <small>LOCATION</small>
-                    <span id="location-display">학교</span>
+                    <span id="location-display">루루 아카데미</span>
                 </div>
                 <div class="hud-box">
                     <small>POS</small>
@@ -433,7 +444,7 @@
 
         <div id="bottom-bar">
             <div class="avatar-diamond">
-                <span>M</span>
+                <span>R</span>
             </div>
             <div class="bars">
                 <div class="bar-container"><div id="hp-bar" class="bar-fill"></div></div>
@@ -444,24 +455,19 @@
 
     <div id="pause-menu">
         <h1>루루 월드</h1>
-        <p>판타지 디오라마 테스트 맵</p>
+        <p>별빛 왕국의 항해</p>
         <button id="start-btn">탐험 시작</button>
-        <div class="key-hint">
-            <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동
-            <kbd>DRAG</kbd> 시점
-            <kbd>SHIFT</kbd> 달리기
-            <kbd>SPACE</kbd> 점프
-            <kbd>E</kbd> 대화 / 메뉴
-        </div>
+        <div class="key-hint">왕도와 항구, 고대 유적을 잇는 작은 모험</div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
-    <script src="js/config.js?v=20260529h"></script>
-    <script src="js/collision-engine.js?v=20260529h"></script>
-    <script src="js/ui-engine.js?v=20260529h"></script>
-    <script src="js/map-engine.js?v=20260529h"></script>
-    <script src="js/player-engine.js?v=20260529h"></script>
-    <script src="js/game-engine.js?v=20260529h"></script>
+    <script src="js/config.js?v=20260613-fantasy4"></script>
+    <script src="js/fantasy-visuals.js?v=20260613-fantasy4"></script>
+    <script src="js/collision-engine.js?v=20260613-fantasy4"></script>
+    <script src="js/ui-engine.js?v=20260613-fantasy4"></script>
+    <script src="js/map-engine.js?v=20260613-fantasy4"></script>
+    <script src="js/player-engine.js?v=20260613-fantasy4"></script>
+    <script src="js/game-engine.js?v=20260613-fantasy4"></script>
 </body>
 </html>

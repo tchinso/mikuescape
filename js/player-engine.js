@@ -369,5 +369,138 @@
         }
     }
 
+    PlayerEngine.prototype.boardDockedBoat = function () {
+        const dock = this.state.boatDock;
+        if (!dock) return;
+
+        this.state.onBoat = true;
+        this.state.boatDock = null;
+        this.camera.position.set(dock.x, C.waterLevel + C.boatEyeHeight, dock.z);
+        this.velocity.set(0, 0, 0);
+        this.isGrounded = true;
+        this.ui.setBoatStatus("승선 중");
+        this.ui.showToast("정박해 둔 돛단배에 올랐습니다.", 1.4);
+    };
+
+    PlayerEngine.prototype.resolveLandMovement = function (pos, dt) {
+        if (this.world.isSea(pos.x, pos.z)) {
+            pos.x = this.previous.x;
+            pos.z = this.previous.z;
+            this.velocity.x = 0;
+            this.velocity.z = 0;
+            if (this.seaToastCooldown <= 0) {
+                this.ui.showToast("맨몸으로는 바다에 들어갈 수 없습니다. 항구에서 돛단배가 필요합니다.");
+                this.seaToastCooldown = 1.5;
+            }
+        }
+
+        this.collision.resolveObstacles(pos, C.playerRadius);
+        this.collision.clampToBounds(pos);
+
+        const ground = this.world.heightAt(pos.x, pos.z);
+        if (pos.y < ground + C.eyeHeight) {
+            pos.y = ground + C.eyeHeight;
+            this.velocity.y = Math.max(0, this.velocity.y);
+            this.isGrounded = true;
+        } else {
+            this.isGrounded = false;
+            pos.y += this.velocity.y * dt;
+        }
+
+        if (pos.y < -30) {
+            this.placeAt(-166, -96);
+            this.velocity.set(0, 0, 0);
+        }
+    };
+
+    PlayerEngine.prototype.resolveBoatMovement = function (pos) {
+        if (!this.world.isBoatAllowed(pos.x, pos.z)) {
+            if (this.dockBoatAtShore(pos)) return;
+
+            pos.x = this.previous.x;
+            pos.z = this.previous.z;
+            this.velocity.x = 0;
+            this.velocity.z = 0;
+            if (this.seaToastCooldown <= 0) {
+                this.ui.showToast("돛단배는 항구 수면과 바다에서만 움직일 수 있습니다.");
+                this.seaToastCooldown = 1.3;
+            }
+        }
+
+        this.collision.resolveObstacles(pos, C.playerRadius + 1.2);
+        this.collision.clampToBounds(pos);
+        pos.y = C.waterLevel + C.boatEyeHeight;
+        this.velocity.y = 0;
+        this.isGrounded = true;
+    };
+
+    PlayerEngine.prototype.dockBoatAtShore = function (pos) {
+        const spot = this.world.getBoatDockingSpot(pos, this.previous);
+        if (!spot) return false;
+
+        this.camera.getWorldDirection(this.tmpDir);
+        this.state.onBoat = false;
+        this.state.boatDock = {
+            x: spot.boat.x,
+            z: spot.boat.z,
+            heading: Math.atan2(this.tmpDir.x, this.tmpDir.z)
+        };
+
+        pos.x = spot.land.x;
+        pos.z = spot.land.z;
+        this.collision.resolveObstacles(pos, C.playerRadius);
+        this.collision.clampToBounds(pos);
+        if (this.world.isSea(pos.x, pos.z)) {
+            pos.x = spot.land.x;
+            pos.z = spot.land.z;
+        }
+        pos.y = this.world.heightAt(pos.x, pos.z) + C.eyeHeight;
+
+        this.velocity.set(0, 0, 0);
+        this.isGrounded = true;
+        this.ui.setBoatStatus("정박 중");
+        this.ui.showToast("돛단배를 해안에 정박했습니다. 다시 타려면 정박한 곳으로 돌아가세요.", 2.4);
+        return true;
+    };
+
+    PlayerEngine.prototype.updateHud = function () {
+        const pos = this.camera.position;
+        this.ui.setPosition(pos.x, pos.z);
+        this.ui.setStamina(this.stamina);
+        this.ui.setBoatStatus(this.getBoatStatusText());
+        this.ui.setLocation(this.world.getLocation(pos.x, pos.z, this.state));
+
+        this.camera.getWorldDirection(this.tmpDir);
+        this.ui.setDirection(Math.atan2(this.tmpDir.x, this.tmpDir.z));
+
+        const target = this.findStaticInteraction(pos);
+        if (target && target.id === "port" && this.state.onBoat && !this.ui.dialogVisible) {
+            this.promptTarget = target;
+            this.ui.showInteraction("항구 반납");
+        } else if (target && target.id === "port" && this.world.isBoatDockedAtPort(this.state) && !this.ui.dialogVisible) {
+            this.promptTarget = target;
+            this.ui.showInteraction("돛단배 반납");
+        } else if (this.canBoardDockedBoat(pos) && !this.ui.dialogVisible) {
+            this.promptTarget = null;
+            this.ui.showInteraction("돛단배 타기");
+        } else if (target && !this.ui.dialogVisible) {
+            this.promptTarget = target;
+            this.ui.showInteraction(target.label);
+        } else if (this.state.onBoat && this.world.isSea(pos.x, pos.z) && !this.ui.dialogVisible) {
+            this.promptTarget = null;
+            this.ui.showInteraction("바다 메뉴");
+        } else {
+            this.promptTarget = null;
+            this.ui.hideInteraction();
+        }
+    };
+
+    PlayerEngine.prototype.getBoatStatusText = function () {
+        if (this.state.onBoat) return "승선 중";
+        if (this.state.hasBoat && this.state.boatDock) return "정박 중";
+        if (this.state.hasBoat) return "대여 중";
+        return "미보유";
+    };
+
     ns.PlayerEngine = PlayerEngine;
 })();

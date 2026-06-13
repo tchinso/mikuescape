@@ -130,5 +130,22 @@
         }
     }
 
+    UIEngine.prototype.showDialog = function (data) {
+        this.dialogVisible = true;
+        this.dom.dialogTitle.textContent = data.title || "장소";
+        this.dom.dialogBody.textContent = data.body || "";
+        this.dom.dialogMenu.innerHTML = "";
+
+        const items = data.items || [];
+        for (let i = 0; i < items.length; i++) {
+            const li = document.createElement("li");
+            li.textContent = items[i];
+            this.dom.dialogMenu.appendChild(li);
+        }
+
+        this.dom.dialog.classList.add("visible");
+        this.hideInteraction();
+    };
+
     ns.UIEngine = UIEngine;
 })();
