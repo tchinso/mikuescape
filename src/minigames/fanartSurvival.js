@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-export const FANART_FLOOR = 12;
+export const FANART_FLOOR = 3;
 export const FANART_START_POSITION = new THREE.Vector3(0, 0, 0);
 export const FANART_SPEED_MULTIPLIER = 5;
 
@@ -84,7 +84,7 @@ export function createFanartSurvival({
 
   function createStage() {
     const group = new THREE.Group();
-    group.name = "floor-12-fanart-survival";
+    group.name = "floor-3-fanart-survival";
 
     const padMaterial = new THREE.MeshBasicMaterial({
       color: "#22d3ee",
@@ -184,7 +184,7 @@ export function createFanartSurvival({
 
   function showIntroPopup() {
     showPopup(
-      "12층 생존전",
+      "3층 생존전",
       "치료약을 모으며 미쿠를 지켜 주세요. 가운데 원 안에서 E를 누르면 시작합니다.",
       "확인",
     );
@@ -560,7 +560,7 @@ export function createFanartSurvival({
     updateHud();
     updateSurvivalHud();
     showPopup(
-      "12층 생존 실패",
+      "3층 생존 실패",
       "미쿠의 체력이 0이 되었습니다. 치료약 생존전을 처음부터 다시 시작해야 합니다.",
       "처음부터",
       () => {
@@ -585,7 +585,7 @@ export function createFanartSurvival({
     updateSurvivalHud();
     updateHud();
 
-    const recruitName = getCurrentRecruit()?.def.name ?? "12층 동료";
+    const recruitName = getCurrentRecruit()?.def.name ?? "3층 동료";
     if (getCurrentRecruit()) {
       recruitCurrent();
     } else {
@@ -594,7 +594,7 @@ export function createFanartSurvival({
 
     showPopup(
       "치료약 수집 성공",
-      `FanArt가 끝날 때까지 버텼습니다. ${recruitName}가 동료로 합류했고 12층 문이 열렸습니다.`,
+      `FanArt가 끝날 때까지 버텼습니다. ${recruitName}가 동료로 합류했고 3층 문이 열렸습니다.`,
       "확인",
     );
   }

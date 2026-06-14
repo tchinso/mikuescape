@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-export const GOTHIC_FLOOR = 11;
+export const GOTHIC_FLOOR = 2;
 export const GOTHIC_START_POSITION = new THREE.Vector3(0, 0, 31.5);
 export const GOTHIC_RECRUIT_POSITION = new THREE.Vector3(0, 0, -31.5);
 
@@ -74,7 +74,7 @@ export function createGothicMemory({
 
   function createStage() {
     const group = new THREE.Group();
-    group.name = "floor-11-gothic-memory";
+    group.name = "floor-2-gothic-memory";
 
     const baseMaterial = new THREE.MeshStandardMaterial({
       color: "#111827",
@@ -194,7 +194,7 @@ export function createGothicMemory({
 
   function showIntroPopup() {
     showPopup(
-      "11층 기억 대결",
+      "2층 기억 대결",
       "Gothic이 보여주는 순서를 기억해 주세요. 미쿠 쪽 바닥이 빛나면 같은 순서로 눌러요.",
       "확인",
     );
@@ -537,7 +537,7 @@ export function createGothicMemory({
     updateGothicHud();
     updateHud();
     showPopup(
-      "11층 실패",
+      "2층 실패",
       message,
       "처음부터",
       () => {
@@ -587,7 +587,7 @@ export function createGothicMemory({
     }
 
     showPopup(
-      "11층 성공",
+      "2층 성공",
       `${recruitName}이 동료가 되었습니다. 이제 문으로 나갈 수 있어요.`,
       "확인",
     );

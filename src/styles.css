@@ -283,6 +283,11 @@ button {
   background: linear-gradient(90deg, #38bdf8, #a78bfa, #f472b6);
 }
 
+.bullet-meter span {
+  width: 0;
+  background: linear-gradient(90deg, #22d3ee, #facc15, #fb7185);
+}
+
 .rhythm-stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

@@ -12,6 +12,11 @@ import {
   GOTHIC_START_POSITION,
   createGothicMemory,
 } from "./minigames/gothicMemory.js";
+import {
+  BADCHILD_FLOOR,
+  BADCHILD_START_POSITION,
+  createBadchildSurvivor,
+} from "./minigames/badchildSurvivor.js";
 
 const MODEL_DEFS = [
   {
@@ -39,84 +44,12 @@ const MODEL_DEFS = [
     gait: { stride: 1.28, bob: 1.18, sway: 0.8 },
   },
   {
-    key: "fallen",
-    name: "Fallen Angel",
-    shortName: "Angel",
-    color: "#60a5fa",
-    url: new URL("../assets/3d/04.fallen angel girl.glb", import.meta.url).href,
-    gait: { stride: 0.96, bob: 0.86, sway: 1.12 },
-  },
-  {
     key: "neptune",
     name: "Hyperdimension Neptune",
     shortName: "Neptune",
     color: "#c084fc",
     url: new URL("../assets/3d/05.hyperdimension neptune girl.glb", import.meta.url).href,
     gait: { stride: 1.06, bob: 0.95, sway: 1.0 },
-  },
-  {
-    key: "swimsuit",
-    name: "School Swimsuit",
-    shortName: "Swimsuit",
-    color: "#38bdf8",
-    url: new URL("../assets/3d/06.school swimsuit girl.glb", import.meta.url).href,
-    gait: { stride: 1.18, bob: 1.02, sway: 0.86 },
-  },
-  {
-    key: "pajama",
-    name: "Pajama",
-    shortName: "Pajama",
-    color: "#fb7185",
-    url: new URL("../assets/3d/07.pajama girl.glb", import.meta.url).href,
-    gait: { stride: 0.9, bob: 0.82, sway: 1.16 },
-  },
-  {
-    key: "fox",
-    name: "Chibi Fox-ear",
-    shortName: "Fox-ear",
-    color: "#fbbf24",
-    url: new URL("../assets/3d/08.chibi fox-ear girl.glb", import.meta.url).href,
-    gait: { stride: 1.34, bob: 1.24, sway: 0.92 },
-  },
-  {
-    key: "summer",
-    name: "Bikini",
-    shortName: "Bikini",
-    color: "#fb923c",
-    url: new URL("../assets/3d/09.bikini girl.glb", import.meta.url).href,
-    gait: { stride: 1.0, bob: 0.9, sway: 0.94 },
-  },
-  {
-    key: "cat",
-    name: "Cat-ear Modern",
-    shortName: "Cat-ear",
-    color: "#34d399",
-    url: new URL("../assets/3d/10.cat-ear modern girl.glb", import.meta.url).href,
-    gait: { stride: 1.2, bob: 1.08, sway: 0.96 },
-  },
-  {
-    key: "chibi-town",
-    name: "Chibi Town",
-    shortName: "Town",
-    color: "#facc15",
-    url: new URL("../assets/3d/11.chibi town girl.glb", import.meta.url).href,
-    gait: { stride: 1.38, bob: 1.22, sway: 0.78 },
-  },
-  {
-    key: "animal-town",
-    name: "Town Animal-ear",
-    shortName: "Animal-ear",
-    color: "#22d3ee",
-    url: new URL("../assets/3d/12.town animal-ear girl.glb", import.meta.url).href,
-    gait: { stride: 1.15, bob: 0.98, sway: 1.06 },
-  },
-  {
-    key: "beret",
-    name: "Beret Onepiece",
-    shortName: "Beret",
-    color: "#ef4444",
-    url: new URL("../assets/3d/13.beret onepiece girl.glb", import.meta.url).href,
-    gait: { stride: 0.94, bob: 0.88, sway: 1.18 },
   },
 ];
 
@@ -130,7 +63,8 @@ const MAX_TRAIL = 720;
 const START_POSITION = new THREE.Vector3(0, 0, ROOM_HALF - 4);
 const EXIT_POSITION = new THREE.Vector3(0, 0, -ROOM_HALF + 0.35);
 const ROOFTOP_FLOOR = 13;
-const STANDARD_TOP_FLOOR = 12;
+const FLOOR_ORDER = [ROOFTOP_FLOOR, FANART_FLOOR, GOTHIC_FLOOR, BADCHILD_FLOOR];
+const RECRUIT_FLOORS = [FANART_FLOOR, GOTHIC_FLOOR, BADCHILD_FLOOR];
 const ROOFTOP_STAGE_NAME = "옥상 스테이지";
 const ROOFTOP_AUDIO_URL = new URL("../assets/rhythm/gunpowder-audio.mp3", import.meta.url).href;
 const ROOFTOP_CHART_URL = new URL("../assets/rhythm/gunpowder-chart.json", import.meta.url).href;
@@ -157,18 +91,9 @@ const RHYTHM_JUDGES = {
 
 const FLOOR_THEMES = [
   { floor: 13, label: ROOFTOP_STAGE_NAME, floorColor: "#203341", grid: "#38bdf8", wall: "#142431" },
-  { floor: 12, floorColor: "#26343b", grid: "#6ee7b7", wall: "#182922" },
-  { floor: 11, floorColor: "#322f3f", grid: "#c084fc", wall: "#211c2f" },
-  { floor: 10, floorColor: "#383128", grid: "#fbbf24", wall: "#2b2218" },
-  { floor: 9, floorColor: "#273846", grid: "#22d3ee", wall: "#172b34" },
-  { floor: 8, floorColor: "#392f34", grid: "#fb7185", wall: "#2c1d25" },
-  { floor: 7, floorColor: "#26362f", grid: "#34d399", wall: "#16271f" },
-  { floor: 6, floorColor: "#373443", grid: "#a78bfa", wall: "#242130" },
-  { floor: 5, floorColor: "#3a3228", grid: "#fb923c", wall: "#2a2118" },
-  { floor: 4, floorColor: "#293546", grid: "#60a5fa", wall: "#182336" },
-  { floor: 3, floorColor: "#353a2a", grid: "#bef264", wall: "#232a18" },
-  { floor: 2, floorColor: "#3b2f38", grid: "#f472b6", wall: "#291f28" },
-  { floor: 1, floorColor: "#24322f", grid: "#6ee7b7", wall: "#13251f" },
+  { floor: 3, floorColor: "#26343b", grid: "#6ee7b7", wall: "#182922" },
+  { floor: 2, floorColor: "#322f3f", grid: "#c084fc", wall: "#211c2f" },
+  { floor: 1, floorColor: "#273846", grid: "#22d3ee", wall: "#172b34" },
 ];
 
 const dom = {
@@ -208,6 +133,14 @@ const dom = {
   gothicLength: document.querySelector("#gothicLength"),
   gothicInput: document.querySelector("#gothicInput"),
   gothicKeys: document.querySelector("#gothicKeys"),
+  bulletHud: document.querySelector("#bulletHud"),
+  bulletSong: document.querySelector("#bulletSong"),
+  bulletStatus: document.querySelector("#bulletStatus"),
+  bulletProgressFill: document.querySelector("#bulletProgressFill"),
+  bulletProgressText: document.querySelector("#bulletProgressText"),
+  bulletPattern: document.querySelector("#bulletPattern"),
+  bulletTime: document.querySelector("#bulletTime"),
+  bulletHint: document.querySelector("#bulletHint"),
   popup: document.querySelector("#popup"),
   popupTitle: document.querySelector("#popupTitle"),
   popupBody: document.querySelector("#popupBody"),
@@ -344,6 +277,25 @@ const gothicGame = createGothicMemory({
   recruitCurrent,
 });
 
+const badchildGame = createBadchildSurvivor({
+  roomHalf: ROOM_HALF,
+  dom,
+  createTextSprite,
+  getCurrentFloor: () => currentFloor,
+  getPlayer: () => player,
+  getCurrentRecruit: () => currentRecruit,
+  isEscapeComplete: () => escapeComplete,
+  clearPointerTarget: () => {
+    pointerTargetActive.value = false;
+  },
+  resetTrail,
+  showMessage,
+  showPopup,
+  updateHud,
+  openExit,
+  recruitCurrent,
+});
+
 init().catch(handleFatalError);
 
 async function init() {
@@ -358,6 +310,7 @@ async function init() {
   scene.add(audience.group);
   scene.add(fanartGame.createStage().group);
   scene.add(gothicGame.createStage().group);
+  scene.add(badchildGame.createStage().group);
 
   await loadModels();
 
@@ -371,6 +324,7 @@ async function init() {
   resetRooftopPerformance();
   fanartGame.reset();
   gothicGame.reset();
+  badchildGame.reset();
   applyFloorTheme();
 
   if (developerShortcutFloor !== null) {
@@ -410,6 +364,10 @@ function bindEvents() {
     }
 
     if (fanartGame.handleKeyDown(event)) {
+      return;
+    }
+
+    if (badchildGame.handleKeyDown(event)) {
       return;
     }
 
@@ -983,6 +941,7 @@ function tick() {
   updateRooftopStage(dt, elapsed);
   fanartGame.update(dt, elapsed);
   gothicGame.update(dt, elapsed);
+  badchildGame.update(dt, elapsed);
 
   if (player && !escapeComplete) {
     updatePlayer(dt);
@@ -1156,6 +1115,10 @@ function checkRecruitCollision() {
     return;
   }
 
+  if (currentFloor === BADCHILD_FLOOR && !badchildGame.isCleared()) {
+    return;
+  }
+
   const distance = player.group.position.distanceTo(currentRecruit.group.position);
   if (distance < 1.05) {
     recruitCurrent();
@@ -1174,6 +1137,11 @@ function recruitCurrent() {
 
   if (currentFloor === GOTHIC_FLOOR && !gothicGame.isCleared()) {
     showMessage("기억 대결을 클리어해야 동료가 합류합니다.", 1800);
+    return;
+  }
+
+  if (currentFloor === BADCHILD_FLOOR && !badchildGame.isCleared()) {
+    showMessage("Bad Child를 끝까지 피해야 동료가 합류합니다.", 1800);
     return;
   }
 
@@ -1207,9 +1175,11 @@ function openExit() {
   if (currentFloor === ROOFTOP_FLOOR) {
     showMessage("관객 만족! 옥상문이 열렸습니다.", 2400);
   } else if (currentFloor === FANART_FLOOR) {
-    showMessage("치료약 확보! 12층 문이 열렸습니다.", 2400);
+    showMessage("치료약 확보! 3층 문이 열렸습니다.", 2400);
   } else if (currentFloor === GOTHIC_FLOOR) {
-    showMessage("Gothic 합류! 11층 문이 열렸습니다.", 2400);
+    showMessage("Gothic 합류! 2층 문이 열렸습니다.", 2400);
+  } else if (currentFloor === BADCHILD_FLOOR) {
+    showMessage("Bad Child 생존 성공! 출구가 열렸습니다.", 2400);
   } else {
     showMessage(currentFloor === 1 ? "출구 개방" : "문 열림");
   }
@@ -1236,12 +1206,17 @@ function advanceDebugStep() {
   }
 
   if (currentFloor === FANART_FLOOR && !fanartGame.isCleared()) {
-    showMessage("12층 치료약 생존전을 먼저 클리어해야 합니다.", 1800);
+    showMessage("3층 치료약 생존전을 먼저 클리어해야 합니다.", 1800);
     return;
   }
 
   if (currentFloor === GOTHIC_FLOOR && !gothicGame.isCleared()) {
-    showMessage("11층 기억 대결을 먼저 클리어해야 합니다.", 1800);
+    showMessage("2층 기억 대결을 먼저 클리어해야 합니다.", 1800);
+    return;
+  }
+
+  if (currentFloor === BADCHILD_FLOOR && !badchildGame.isCleared()) {
+    showMessage("Bad Child가 끝날 때까지 한 번도 맞지 않아야 합니다.", 1800);
     return;
   }
 
@@ -1278,7 +1253,19 @@ function completeDoorTransition() {
     gothicGame.reset();
   }
 
-  currentFloor -= 1;
+  if (leavingFloor === BADCHILD_FLOOR) {
+    badchildGame.reset();
+  }
+
+  const nextFloor = getNextFloor(currentFloor);
+  if (nextFloor === null) {
+    escapeComplete = true;
+    updateHud();
+    showMessage("탈출 완료", 2800);
+    return;
+  }
+
+  currentFloor = nextFloor;
   exitOpen = followers.length >= COMPANION_COUNT && currentFloor === 1;
   applyFloorTheme();
   placePartyAtStart();
@@ -1299,6 +1286,15 @@ function completeDoorTransition() {
     window.setTimeout(() => {
       if (!escapeComplete && currentFloor === GOTHIC_FLOOR) {
         gothicGame.showIntroPopup();
+      }
+    }, 120);
+  }
+
+  if (currentFloor === BADCHILD_FLOOR) {
+    badchildGame.reset({ placePlayer: true });
+    window.setTimeout(() => {
+      if (!escapeComplete && currentFloor === BADCHILD_FLOOR) {
+        badchildGame.showIntroPopup();
       }
     }, 120);
   }
@@ -1326,6 +1322,7 @@ function applyFloorTheme() {
   updateRooftopVisibility();
   fanartGame.updateVisibility();
   gothicGame.updateVisibility();
+  badchildGame.updateVisibility();
 }
 
 function updateHud() {
@@ -1340,6 +1337,8 @@ function updateHud() {
     dom.nextValue.textContent = fanartGame.goalText();
   } else if (currentFloor === GOTHIC_FLOOR && !gothicGame.isCleared()) {
     dom.nextValue.textContent = gothicGame.goalText();
+  } else if (currentFloor === BADCHILD_FLOOR && !badchildGame.isCleared()) {
+    dom.nextValue.textContent = badchildGame.goalText();
   } else if (currentRecruit) {
     dom.nextValue.textContent = currentRecruit.def.name;
   } else if (exitOpen && currentFloor === 1) {
@@ -1370,7 +1369,7 @@ function renderRoster() {
 
     const floor = document.createElement("span");
     floor.className = "roster-floor";
-    floor.textContent = `${STANDARD_TOP_FLOOR - index}F`;
+    floor.textContent = `${RECRUIT_FLOORS[index] ?? index + 1}F`;
     row.append(floor);
 
     dom.rosterList.append(row);
@@ -1407,6 +1406,18 @@ function isPopupOpen() {
   return !dom.popup.classList.contains("hidden");
 }
 
+function isValidFloor(floor) {
+  return FLOOR_ORDER.includes(floor);
+}
+
+function getNextFloor(floor) {
+  const index = FLOOR_ORDER.indexOf(floor);
+  if (index < 0 || index >= FLOOR_ORDER.length - 1) {
+    return null;
+  }
+  return FLOOR_ORDER[index + 1];
+}
+
 function getInitialFloor() {
   return getDeveloperShortcutFloor() ?? ROOFTOP_FLOOR;
 }
@@ -1422,7 +1433,7 @@ function getDeveloperShortcutFloor() {
   }
 
   const floor = Number(floorParam);
-  if (!Number.isInteger(floor) || floor < 1 || floor > ROOFTOP_FLOOR) {
+  if (!Number.isInteger(floor) || !isValidFloor(floor)) {
     return null;
   }
 
@@ -1435,6 +1446,9 @@ function getInitialPlayerPosition(shortcutFloor) {
   }
   if (shortcutFloor === GOTHIC_FLOOR) {
     return GOTHIC_START_POSITION;
+  }
+  if (shortcutFloor === BADCHILD_FLOOR) {
+    return BADCHILD_START_POSITION;
   }
   return START_POSITION;
 }
@@ -1466,6 +1480,13 @@ function setupDeveloperShortcutFloor(floor) {
     resetTrail();
   }
 
+  if (floor === BADCHILD_FLOOR) {
+    player.group.position.copy(BADCHILD_START_POSITION);
+    player.group.rotation.y = Math.PI;
+    player.previousPosition.copy(player.group.position);
+    resetTrail();
+  }
+
   renderRoster();
   updateHud();
 
@@ -1487,12 +1508,18 @@ function setupDeveloperShortcutFloor(floor) {
     gothicGame.showIntroPopup();
   }
 
+  if (floor === BADCHILD_FLOOR) {
+    badchildGame.reset({ placePlayer: true });
+    badchildGame.showIntroPopup();
+  }
+
   showMessage(`${floor}F 개발자 테스트`);
 }
 
 function seedDeveloperFollowersForFloor(floor) {
-  const followerCount = floor <= STANDARD_TOP_FLOOR
-    ? THREE.MathUtils.clamp(STANDARD_TOP_FLOOR - floor, 0, COMPANION_COUNT)
+  const floorIndex = RECRUIT_FLOORS.indexOf(floor);
+  const followerCount = floorIndex >= 0
+    ? THREE.MathUtils.clamp(floorIndex, 0, COMPANION_COUNT)
     : 0;
 
   for (let i = 1; i <= followerCount; i += 1) {

@@ -25,7 +25,7 @@
         </div>
         <div class="stat-row">
           <span>동료</span>
-          <strong id="friendValue">0 / 12</strong>
+          <strong id="friendValue">0 / 3</strong>
         </div>
         <div class="stat-row">
           <span>목표</span>
@@ -132,6 +132,34 @@
         </div>
       </div>
 
+      <div id="bulletHud" class="hud rhythm-hud bullet-hud hidden" aria-live="polite">
+        <div class="rhythm-heading">
+          <span id="bulletSong">Bad Child · Bullet Survivor</span>
+          <strong id="bulletStatus">시작 원에서 E</strong>
+        </div>
+        <div class="life-meter bullet-meter">
+          <span id="bulletProgressFill"></span>
+        </div>
+        <div class="rhythm-stats">
+          <div>
+            <span>Progress</span>
+            <strong id="bulletProgressText">0%</strong>
+          </div>
+          <div>
+            <span>Pattern</span>
+            <strong id="bulletPattern">Puzzle Warmup</strong>
+          </div>
+          <div>
+            <span>Time</span>
+            <strong id="bulletTime">0:00 / --:--</strong>
+          </div>
+          <div>
+            <span>Goal</span>
+            <strong id="bulletHint">시작 원 E</strong>
+          </div>
+        </div>
+      </div>
+
       <div id="message" class="message hidden"></div>
 
       <div id="popup" class="popup hidden" role="dialog" aria-modal="true" aria-labelledby="popupTitle">
@@ -147,7 +175,7 @@
 
       <div id="loading" class="loading">
         <strong>모델 불러오는 중</strong>
-        <span id="loadingDetail">0 / 13</span>
+        <span id="loadingDetail">0 / 4</span>
       </div>
     </div>
 
