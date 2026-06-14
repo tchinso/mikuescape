@@ -8,7 +8,8 @@ const START_RADIUS = 5.2;
 const PLAYER_HIT_RADIUS = 0.72;
 const PUZZLE_POOL_SIZE = 110;
 const LASER_POOL_SIZE = 10;
-const CIRCLE_POOL_SIZE = 5;
+const CIRCLE_POOL_SIZE = 12;
+const CIRCLE_ONLY_TARGET_COUNT = 10;
 const FEATHER_POOL_SIZE = 90;
 const LASER_WARNING_SECONDS = 0.75;
 const LASER_ACTIVE_SECONDS = 0.34;
@@ -520,13 +521,36 @@ export function createBadchildSurvivor({
   }
 
   function updateCircleSpawner(dt, songTime) {
+    const circleOnly = isCircleOnlyTime(songTime);
     const pressure = songTime >= LASER_CIRCLE_END ? 1 : songTime >= CIRCLE_ONLY_END ? 0.72 : 0.35;
-    const interval = THREE.MathUtils.lerp(2.25, 1.65, pressure);
+    const interval = circleOnly ? 0.55 : THREE.MathUtils.lerp(2.25, 1.65, pressure);
+
+    if (circleOnly) {
+      fillCircleOnlyArena();
+    }
+
     state.circleTimer -= dt;
     while (state.circleTimer <= 0) {
-      spawnCircle(pressure);
+      const burstCount = circleOnly
+        ? Math.max(1, Math.min(3, CIRCLE_ONLY_TARGET_COUNT - getActiveCircleCount()))
+        : 1;
+      for (let i = 0; i < burstCount; i += 1) {
+        spawnCircle(circleOnly ? 0.78 : pressure, { roaming: circleOnly });
+      }
       state.circleTimer += interval;
     }
+  }
+
+  function fillCircleOnlyArena() {
+    while (getActiveCircleCount() < CIRCLE_ONLY_TARGET_COUNT) {
+      if (!spawnCircle(0.78, { roaming: true })) {
+        return;
+      }
+    }
+  }
+
+  function getActiveCircleCount() {
+    return stage.circles.reduce((count, circle) => count + (circle.active ? 1 : 0), 0);
   }
 
   function updateFeatherSpawner(dt, songTime) {
@@ -595,33 +619,36 @@ export function createBadchildSurvivor({
     laser.core.scale.z = THREE.MathUtils.lerp(0.82, 1.0, pressure);
   }
 
-  function spawnCircle(pressure) {
+  function spawnCircle(pressure, options = {}) {
     const circle = stage.circles.find((item) => !item.active);
     if (!circle) {
-      return;
+      return false;
     }
 
-    const spawnLimit = roomHalf - 8;
+    const roaming = Boolean(options.roaming);
+    const spawnLimit = roomHalf - (roaming ? 5 : 8);
     circle.group.position.set(
       THREE.MathUtils.randFloat(-spawnLimit, spawnLimit),
       0,
       THREE.MathUtils.randFloat(-spawnLimit, spawnLimit),
     );
-    circle.velocity.set(
-      THREE.MathUtils.randFloatSpread(4.8 + pressure * 2.6),
-      0,
-      THREE.MathUtils.randFloatSpread(4.8 + pressure * 2.6),
-    );
-    if (circle.velocity.lengthSq() < 1) {
-      circle.velocity.set(2.8, 0, -2.6);
-    }
+    const angle = Math.random() * Math.PI * 2;
+    const speed = roaming
+      ? THREE.MathUtils.randFloat(8.5, 13.5)
+      : THREE.MathUtils.randFloat(4.8 + pressure * 1.4, 7.4 + pressure * 2.8);
+    circle.velocity.set(Math.cos(angle) * speed, 0, Math.sin(angle) * speed);
     circle.age = 0;
-    circle.life = THREE.MathUtils.lerp(5.2, 4.25, pressure);
-    circle.maxRadius = THREE.MathUtils.lerp(3.7, 5.1, pressure);
+    circle.life = roaming
+      ? THREE.MathUtils.randFloat(7.2, 9.4)
+      : THREE.MathUtils.lerp(5.2, 4.25, pressure);
+    circle.maxRadius = roaming
+      ? THREE.MathUtils.randFloat(3.0, 4.15)
+      : THREE.MathUtils.lerp(3.7, 5.1, pressure);
     circle.radius = 0.1;
     circle.active = true;
     circle.group.visible = true;
     circle.group.scale.setScalar(0.1);
+    return true;
   }
 
   function spawnFeather(pressure) {
@@ -944,8 +971,12 @@ export function createBadchildSurvivor({
       || songTime >= LASER_CIRCLE_END;
   }
 
+  function isCircleOnlyTime(songTime) {
+    return songTime >= LASER_ONLY_END && songTime < CIRCLE_ONLY_END;
+  }
+
   function isCirclePatternTime(songTime) {
-    return (songTime >= LASER_ONLY_END && songTime < CIRCLE_ONLY_END)
+    return isCircleOnlyTime(songTime)
       || (songTime >= CIRCLE_ONLY_END && songTime < LASER_CIRCLE_END)
       || songTime >= LASER_CIRCLE_END;
   }
