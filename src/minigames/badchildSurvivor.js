@@ -10,6 +10,8 @@ const PUZZLE_POOL_SIZE = 110;
 const LASER_POOL_SIZE = 20;
 const CIRCLE_POOL_SIZE = 12;
 const CIRCLE_ONLY_TARGET_COUNT = 10;
+const CIRCLE_LASER_TARGET_COUNT = Math.round(CIRCLE_ONLY_TARGET_COUNT * 0.7);
+const FINAL_CIRCLE_TARGET_COUNT = Math.round(CIRCLE_ONLY_TARGET_COUNT * 0.4);
 const FEATHER_POOL_SIZE = 90;
 const LASER_WARNING_SECONDS = 0.75;
 const LASER_ACTIVE_SECONDS = 0.34;
@@ -539,19 +541,18 @@ export function createBadchildSurvivor({
   }
 
   function updateCircleSpawner(dt, songTime) {
+    const targetCount = getCircleTargetCount(songTime);
     const circleOnly = isCircleOnlyTime(songTime);
     const pressure = songTime >= LASER_CIRCLE_END ? 1 : songTime >= CIRCLE_ONLY_END ? 0.72 : 0.35;
-    const interval = circleOnly ? 0.55 : THREE.MathUtils.lerp(2.25, 1.65, pressure);
+    const interval = circleOnly ? 0.55 : songTime >= LASER_CIRCLE_END ? 1.4 : 0.85;
 
-    if (circleOnly) {
-      fillCircleOnlyArena();
-    }
+    trimActiveCircles(targetCount);
+    fillCircleArena(targetCount, circleOnly);
 
     state.circleTimer -= dt;
     while (state.circleTimer <= 0) {
-      const burstCount = circleOnly
-        ? Math.max(1, Math.min(3, CIRCLE_ONLY_TARGET_COUNT - getActiveCircleCount()))
-        : 1;
+      const missing = targetCount - getActiveCircleCount();
+      const burstCount = Math.max(0, Math.min(circleOnly ? 3 : 2, missing));
       for (let i = 0; i < burstCount; i += 1) {
         spawnCircle(circleOnly ? 0.78 : pressure, { roaming: circleOnly });
       }
@@ -559,16 +560,47 @@ export function createBadchildSurvivor({
     }
   }
 
-  function fillCircleOnlyArena() {
-    while (getActiveCircleCount() < CIRCLE_ONLY_TARGET_COUNT) {
-      if (!spawnCircle(0.78, { roaming: true })) {
+  function fillCircleArena(targetCount, roaming) {
+    const pressure = roaming ? 0.78 : 0.72;
+    while (getActiveCircleCount() < targetCount) {
+      if (!spawnCircle(pressure, { roaming })) {
         return;
       }
     }
   }
 
+  function trimActiveCircles(targetCount) {
+    let extraCount = getActiveCircleCount() - targetCount;
+    if (extraCount <= 0) {
+      return;
+    }
+
+    for (let index = stage.circles.length - 1; index >= 0 && extraCount > 0; index -= 1) {
+      const circle = stage.circles[index];
+      if (!circle.active) {
+        continue;
+      }
+      circle.active = false;
+      circle.group.visible = false;
+      extraCount -= 1;
+    }
+  }
+
   function getActiveCircleCount() {
     return stage.circles.reduce((count, circle) => count + (circle.active ? 1 : 0), 0);
+  }
+
+  function getCircleTargetCount(songTime) {
+    if (isCircleOnlyTime(songTime)) {
+      return CIRCLE_ONLY_TARGET_COUNT;
+    }
+    if (isCircleLaserTime(songTime)) {
+      return CIRCLE_LASER_TARGET_COUNT;
+    }
+    if (songTime >= LASER_CIRCLE_END) {
+      return FINAL_CIRCLE_TARGET_COUNT;
+    }
+    return 0;
   }
 
   function updateFeatherSpawner(dt, songTime) {
