@@ -13,6 +13,7 @@ const FEATHER_POOL_SIZE = 90;
 const LASER_WARNING_SECONDS = 0.75;
 const LASER_ACTIVE_SECONDS = 0.34;
 const PUZZLE_WARMUP_END = 17;
+const PUZZLE_SPAWN_END = 76;
 const PUZZLE_RAIN_END = 77;
 const PUZZLE_PEAK_DENSITY = 0.9;
 const PUZZLE_MIN_INTERVAL = 0.12 / PUZZLE_PEAK_DENSITY;
@@ -421,7 +422,7 @@ export function createBadchildSurvivor({
   }
 
   function preparePatternTimers(songTime) {
-    state.puzzleTimer = songTime < PUZZLE_RAIN_END ? 0.18 : 999;
+    state.puzzleTimer = songTime < PUZZLE_SPAWN_END ? 0.18 : 999;
     state.laserTimer = isLaserPatternTime(songTime) ? 0.16 : 0.7;
     state.circleTimer = isCirclePatternTime(songTime) ? 0.24 : 0.9;
     state.featherTimer = songTime >= LASER_CIRCLE_END ? 0.16 : 0.2;
@@ -466,8 +467,12 @@ export function createBadchildSurvivor({
   }
 
   function updatePatternSpawners(dt, songTime) {
-    if (songTime < PUZZLE_RAIN_END) {
+    if (songTime < PUZZLE_SPAWN_END) {
       updatePuzzleSpawner(dt, songTime);
+    }
+
+    if (songTime >= PUZZLE_RAIN_END) {
+      clearPuzzlePieces();
     }
 
     if (isLaserPatternTime(songTime)) {
@@ -486,7 +491,7 @@ export function createBadchildSurvivor({
   function updatePuzzleSpawner(dt, songTime) {
     const progress = songTime < PUZZLE_WARMUP_END
       ? 0
-      : THREE.MathUtils.clamp((songTime - PUZZLE_WARMUP_END) / (PUZZLE_RAIN_END - PUZZLE_WARMUP_END), 0, 1);
+      : THREE.MathUtils.clamp((songTime - PUZZLE_WARMUP_END) / (PUZZLE_SPAWN_END - PUZZLE_WARMUP_END), 0, 1);
     const interval = songTime < PUZZLE_WARMUP_END
       ? 0.48
       : THREE.MathUtils.lerp(0.32, PUZZLE_MIN_INTERVAL, progress);
@@ -890,8 +895,11 @@ export function createBadchildSurvivor({
     if (seconds < PUZZLE_WARMUP_END) {
       return "Puzzle Warmup";
     }
-    if (seconds < PUZZLE_RAIN_END) {
+    if (seconds < PUZZLE_SPAWN_END) {
       return "Puzzle Rain";
+    }
+    if (seconds < PUZZLE_RAIN_END) {
+      return "Puzzle Break";
     }
     if (seconds < LASER_ONLY_END) {
       return "Laser";
@@ -924,6 +932,10 @@ export function createBadchildSurvivor({
       circle.group.visible = false;
       circle.radius = 0;
     }
+  }
+
+  function clearPuzzlePieces() {
+    stage.puzzlePieces.forEach(deactivateMovingHazard);
   }
 
   function isLaserPatternTime(songTime) {
