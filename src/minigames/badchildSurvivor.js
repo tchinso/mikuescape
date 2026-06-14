@@ -14,6 +14,8 @@ const LASER_WARNING_SECONDS = 0.75;
 const LASER_ACTIVE_SECONDS = 0.34;
 const PUZZLE_WARMUP_END = 17;
 const PUZZLE_RAIN_END = 77;
+const PUZZLE_PEAK_DENSITY = 0.9;
+const PUZZLE_MIN_INTERVAL = 0.12 / PUZZLE_PEAK_DENSITY;
 const LASER_ONLY_END = 137;
 const CIRCLE_ONLY_END = 172;
 const LASER_CIRCLE_END = 210;
@@ -478,7 +480,7 @@ export function createBadchildSurvivor({
       : THREE.MathUtils.clamp((songTime - PUZZLE_WARMUP_END) / (PUZZLE_RAIN_END - PUZZLE_WARMUP_END), 0, 1);
     const interval = songTime < PUZZLE_WARMUP_END
       ? 0.48
-      : THREE.MathUtils.lerp(0.32, 0.12, progress);
+      : THREE.MathUtils.lerp(0.32, PUZZLE_MIN_INTERVAL, progress);
     const burstCount = songTime < PUZZLE_WARMUP_END ? 1 : 1 + Math.floor(progress * 2.2);
 
     state.puzzleTimer -= dt;
