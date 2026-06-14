@@ -96,8 +96,8 @@ const COMPATIBILITY_WARNING_BODY = [
   "",
   "권장 환경",
   "1. 데스크탑",
-  "2. 1920x1080 이상",
-  "3. 가로가 세로의 1.7배 이상",
+  "2. 1280x720 이상",
+  "3. 가로가 세로의 1.33배 이상",
 ].join("\n");
 const RHYTHM_LANE_KEYS = ["Z", "X", "N", "M"];
 const RHYTHM_LANE_CODES = new Map([
@@ -1481,9 +1481,9 @@ function isCompatibleStartupEnvironment() {
   const width = window.innerWidth;
   const height = window.innerHeight;
   return isNonMobileDevice()
-    && width >= 1920
-    && height >= 1080
-    && width / Math.max(height, 1) >= 1.7;
+    && width >= 1280
+    && height >= 720
+    && width / Math.max(height, 1) >= 1.33;
 }
 
 function isNonMobileDevice() {
@@ -1503,10 +1503,10 @@ function getCompatibilityWarningBody() {
   if (!isNonMobileDevice()) {
     missing.push("모바일 환경");
   }
-  if (width < 1920 || height < 1080) {
+  if (width < 1280 || height < 720) {
     missing.push(`현재 해상도 ${width}x${height}`);
   }
-  if (ratio < 1.7) {
+  if (ratio < 1.33) {
     missing.push(`현재 화면 비율 ${ratio.toFixed(2)}:1`);
   }
 
