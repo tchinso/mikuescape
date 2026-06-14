@@ -31,6 +31,7 @@ export function createBadchildSurvivor({
   getCurrentFloor,
   getPlayer,
   getCurrentRecruit,
+  getDeveloperStartSeconds = () => 0,
   isEscapeComplete,
   clearPointerTarget,
   resetTrail,
@@ -55,6 +56,12 @@ export function createBadchildSurvivor({
 
   audio.addEventListener("ended", () => {
     complete();
+  });
+  audio.addEventListener("loadedmetadata", () => {
+    if (state.status !== "playing") {
+      resetAudioTime(getStartSeconds());
+      updateBulletHud();
+    }
   });
 
   function createStage() {
@@ -323,13 +330,14 @@ export function createBadchildSurvivor({
 
   function reset(options = {}) {
     audio.pause();
-    resetAudioTime();
+    const startSeconds = getStartSeconds();
+    resetAudioTime(startSeconds);
     state.status = "ready";
     state.puzzleTimer = 0;
     state.laserTimer = 0;
     state.circleTimer = 0;
     state.featherTimer = 0;
-    state.survivedSeconds = 0;
+    state.survivedSeconds = startSeconds;
     hideHazards();
 
     if (options.placePlayer) {
@@ -386,25 +394,23 @@ export function createBadchildSurvivor({
       return;
     }
 
+    const startSeconds = getStartSeconds();
     state.status = "ready";
-    state.puzzleTimer = 0.18;
-    state.laserTimer = 0.7;
-    state.circleTimer = 0.9;
-    state.featherTimer = 0.2;
-    state.survivedSeconds = 0;
+    preparePatternTimers(startSeconds);
+    state.survivedSeconds = startSeconds;
     hideHazards();
     clearPointerTarget();
     player.previousPosition.copy(player.group.position);
     resetTrail();
 
-    resetAudioTime();
+    resetAudioTime(startSeconds);
 
     try {
       await audio.play();
       state.status = "playing";
       updateHud();
       updateBulletHud();
-      showMessage("Bad Child 시작", 1000);
+      showMessage(startSeconds > 0 ? `${formatSongTime(startSeconds)}부터 Bad Child 시작` : "Bad Child 시작", 1000);
     } catch (error) {
       console.warn("Bad Child playback was blocked.", error);
       state.status = "ready";
@@ -412,6 +418,13 @@ export function createBadchildSurvivor({
       updateBulletHud();
       showPopup("오디오 재생 확인", "브라우저가 음악 재생을 막았습니다. 화면을 클릭한 뒤 시작 원 안에서 E를 다시 눌러주세요.", "확인");
     }
+  }
+
+  function preparePatternTimers(songTime) {
+    state.puzzleTimer = songTime < PUZZLE_RAIN_END ? 0.18 : 999;
+    state.laserTimer = isLaserPatternTime(songTime) ? 0.16 : 0.7;
+    state.circleTimer = isCirclePatternTime(songTime) ? 0.24 : 0.9;
+    state.featherTimer = songTime >= LASER_CIRCLE_END ? 0.16 : 0.2;
   }
 
   function update(dt, elapsed) {
@@ -457,15 +470,11 @@ export function createBadchildSurvivor({
       updatePuzzleSpawner(dt, songTime);
     }
 
-    if ((songTime >= PUZZLE_RAIN_END && songTime < LASER_ONLY_END)
-      || (songTime >= CIRCLE_ONLY_END && songTime < LASER_CIRCLE_END)
-      || songTime >= LASER_CIRCLE_END) {
+    if (isLaserPatternTime(songTime)) {
       updateLaserSpawner(dt, songTime);
     }
 
-    if ((songTime >= LASER_ONLY_END && songTime < CIRCLE_ONLY_END)
-      || (songTime >= CIRCLE_ONLY_END && songTime < LASER_CIRCLE_END)
-      || songTime >= LASER_CIRCLE_END) {
+    if (isCirclePatternTime(songTime)) {
       updateCircleSpawner(dt, songTime);
     }
 
@@ -813,7 +822,9 @@ export function createBadchildSurvivor({
 
     state.status = "failed";
     audio.pause();
-    resetAudioTime();
+    const startSeconds = getStartSeconds();
+    state.survivedSeconds = startSeconds;
+    resetAudioTime(startSeconds);
     hideHazards();
     updateHud();
     updateBulletHud();
@@ -915,6 +926,18 @@ export function createBadchildSurvivor({
     }
   }
 
+  function isLaserPatternTime(songTime) {
+    return (songTime >= PUZZLE_RAIN_END && songTime < LASER_ONLY_END)
+      || (songTime >= CIRCLE_ONLY_END && songTime < LASER_CIRCLE_END)
+      || songTime >= LASER_CIRCLE_END;
+  }
+
+  function isCirclePatternTime(songTime) {
+    return (songTime >= LASER_ONLY_END && songTime < CIRCLE_ONLY_END)
+      || (songTime >= CIRCLE_ONLY_END && songTime < LASER_CIRCLE_END)
+      || songTime >= LASER_CIRCLE_END;
+  }
+
   function deactivateMovingHazard(item) {
     item.active = false;
     item.group.visible = false;
@@ -933,12 +956,25 @@ export function createBadchildSurvivor({
     resetTrail();
   }
 
-  function resetAudioTime() {
+  function resetAudioTime(seconds = 0) {
     try {
-      audio.currentTime = 0;
+      audio.currentTime = seconds;
     } catch {
       // Metadata may not be available yet.
     }
+  }
+
+  function getStartSeconds() {
+    const seconds = Number(getDeveloperStartSeconds());
+    if (!Number.isFinite(seconds) || seconds < 0) {
+      return 0;
+    }
+
+    if (Number.isFinite(audio.duration) && audio.duration > 0) {
+      return Math.min(seconds, Math.max(0, audio.duration - 0.1));
+    }
+
+    return seconds;
   }
 
   return {

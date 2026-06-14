@@ -284,6 +284,7 @@ const badchildGame = createBadchildSurvivor({
   getCurrentFloor: () => currentFloor,
   getPlayer: () => player,
   getCurrentRecruit: () => currentRecruit,
+  getDeveloperStartSeconds,
   isEscapeComplete: () => escapeComplete,
   clearPointerTarget: () => {
     pointerTargetActive.value = false;
@@ -1438,6 +1439,30 @@ function getDeveloperShortcutFloor() {
   }
 
   return floor;
+}
+
+function getDeveloperStartSeconds() {
+  if (!isDeveloperCookieEnabled()) {
+    return 0;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const floor = Number(params.get("floor"));
+  if (floor !== BADCHILD_FLOOR) {
+    return 0;
+  }
+
+  const startParam = params.get("start");
+  if (startParam === null) {
+    return 0;
+  }
+
+  const seconds = Number(startParam);
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    return 0;
+  }
+
+  return seconds;
 }
 
 function getInitialPlayerPosition(shortcutFloor) {
