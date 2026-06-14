@@ -495,9 +495,12 @@ export function createBadchildSurvivor({
   function updateLaserSpawner(dt, songTime) {
     const pressure = songTime >= LASER_CIRCLE_END ? 1 : songTime >= CIRCLE_ONLY_END ? 0.65 : 0.35;
     const interval = THREE.MathUtils.lerp(1.45, 1.02, pressure);
+    const burstCount = songTime >= PUZZLE_RAIN_END && songTime < LASER_ONLY_END ? LASER_POOL_SIZE : 1;
     state.laserTimer -= dt;
     while (state.laserTimer <= 0) {
-      spawnLaser(pressure);
+      for (let i = 0; i < burstCount; i += 1) {
+        spawnLaser(pressure);
+      }
       state.laserTimer += interval;
     }
   }
