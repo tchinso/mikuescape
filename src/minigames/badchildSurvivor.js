@@ -7,7 +7,7 @@ const BADCHILD_AUDIO_URL = new URL("../../assets/musics/badchild.mp3", import.me
 const START_RADIUS = 5.2;
 const PLAYER_HIT_RADIUS = 0.72;
 const PUZZLE_POOL_SIZE = 110;
-const LASER_POOL_SIZE = 10;
+const LASER_POOL_SIZE = 20;
 const CIRCLE_POOL_SIZE = 12;
 const CIRCLE_ONLY_TARGET_COUNT = 10;
 const FEATHER_POOL_SIZE = 90;
@@ -18,6 +18,9 @@ const PUZZLE_SPAWN_END = 76;
 const PUZZLE_RAIN_END = 77;
 const PUZZLE_PEAK_DENSITY = 0.9;
 const PUZZLE_MIN_INTERVAL = 0.12 / PUZZLE_PEAK_DENSITY;
+const FINAL_PUZZLE_REFERENCE_TIME = 45;
+const EDGE_LASER_MARGIN = 1.6;
+const EDGE_LASER_INSET = 5.8;
 const LASER_ONLY_END = 137;
 const CIRCLE_ONLY_END = 172;
 const LASER_CIRCLE_END = 210;
@@ -423,7 +426,7 @@ export function createBadchildSurvivor({
   }
 
   function preparePatternTimers(songTime) {
-    state.puzzleTimer = songTime < PUZZLE_SPAWN_END ? 0.18 : 999;
+    state.puzzleTimer = isPuzzlePatternTime(songTime) ? 0.18 : 999;
     state.laserTimer = isLaserPatternTime(songTime) ? 0.16 : 0.7;
     state.circleTimer = isCirclePatternTime(songTime) ? 0.24 : 0.9;
     state.featherTimer = songTime >= LASER_CIRCLE_END ? 0.16 : 0.2;
@@ -468,11 +471,11 @@ export function createBadchildSurvivor({
   }
 
   function updatePatternSpawners(dt, songTime) {
-    if (songTime < PUZZLE_SPAWN_END) {
+    if (isPuzzlePatternTime(songTime)) {
       updatePuzzleSpawner(dt, songTime);
     }
 
-    if (songTime >= PUZZLE_RAIN_END) {
+    if (songTime >= PUZZLE_RAIN_END && songTime < LASER_CIRCLE_END) {
       clearPuzzlePieces();
     }
 
@@ -490,13 +493,14 @@ export function createBadchildSurvivor({
   }
 
   function updatePuzzleSpawner(dt, songTime) {
-    const progress = songTime < PUZZLE_WARMUP_END
+    const puzzleTime = songTime >= LASER_CIRCLE_END ? FINAL_PUZZLE_REFERENCE_TIME : songTime;
+    const progress = puzzleTime < PUZZLE_WARMUP_END
       ? 0
-      : THREE.MathUtils.clamp((songTime - PUZZLE_WARMUP_END) / (PUZZLE_SPAWN_END - PUZZLE_WARMUP_END), 0, 1);
-    const interval = songTime < PUZZLE_WARMUP_END
+      : THREE.MathUtils.clamp((puzzleTime - PUZZLE_WARMUP_END) / (PUZZLE_SPAWN_END - PUZZLE_WARMUP_END), 0, 1);
+    const interval = puzzleTime < PUZZLE_WARMUP_END
       ? 0.48
       : THREE.MathUtils.lerp(0.32, PUZZLE_MIN_INTERVAL, progress);
-    const burstCount = songTime < PUZZLE_WARMUP_END ? 1 : 1 + Math.floor(progress * 2.2);
+    const burstCount = puzzleTime < PUZZLE_WARMUP_END ? 1 : 1 + Math.floor(progress * 2.2);
 
     state.puzzleTimer -= dt;
     while (state.puzzleTimer <= 0) {
@@ -510,14 +514,28 @@ export function createBadchildSurvivor({
   function updateLaserSpawner(dt, songTime) {
     const pressure = songTime >= LASER_CIRCLE_END ? 1 : songTime >= CIRCLE_ONLY_END ? 0.65 : 0.35;
     const interval = THREE.MathUtils.lerp(1.45, 1.02, pressure);
-    const burstCount = songTime >= PUZZLE_RAIN_END && songTime < LASER_ONLY_END ? LASER_POOL_SIZE : 1;
+    const burstCount = getLaserBurstCount(songTime);
+    const fixedEdgeCount = isCircleLaserTime(songTime) ? 3 : 0;
     state.laserTimer -= dt;
     while (state.laserTimer <= 0) {
       for (let i = 0; i < burstCount; i += 1) {
         spawnLaser(pressure);
       }
+      if (fixedEdgeCount > 0) {
+        spawnFixedEdgeLasers(fixedEdgeCount, pressure);
+      }
       state.laserTimer += interval;
     }
+  }
+
+  function getLaserBurstCount(songTime) {
+    if (songTime >= PUZZLE_RAIN_END && songTime < LASER_ONLY_END) {
+      return 10;
+    }
+    if (isCircleLaserTime(songTime) || songTime >= LASER_CIRCLE_END) {
+      return 5;
+    }
+    return 1;
   }
 
   function updateCircleSpawner(dt, songTime) {
@@ -590,18 +608,22 @@ export function createBadchildSurvivor({
     item.group.visible = true;
   }
 
-  function spawnLaser(pressure) {
+  function spawnLaser(pressure, options = {}) {
     const laser = stage.lasers.find((item) => !item.active);
     if (!laser) {
-      return;
+      return false;
     }
 
     const angles = [0, Math.PI / 2, Math.PI / 4, -Math.PI / 4, Math.PI * 0.18, -Math.PI * 0.18];
-    const angle = angles[Math.floor(Math.random() * angles.length)];
+    const angle = options.angle ?? angles[Math.floor(Math.random() * angles.length)];
     const normalAngle = angle + Math.PI / 2;
     const offset = THREE.MathUtils.randFloat(-18, 18) * (pressure < 0.6 ? 0.8 : 1);
+    const position = options.position ?? {
+      x: Math.cos(normalAngle) * offset,
+      z: Math.sin(normalAngle) * offset,
+    };
 
-    laser.group.position.set(Math.cos(normalAngle) * offset, 0, Math.sin(normalAngle) * offset);
+    laser.group.position.set(position.x, 0, position.z);
     laser.group.rotation.y = -angle;
     laser.group.visible = true;
     laser.warning.visible = true;
@@ -614,9 +636,43 @@ export function createBadchildSurvivor({
     laser.mode = "warning";
     laser.timer = LASER_WARNING_SECONDS;
     laser.angle = angle;
-    laser.width = THREE.MathUtils.lerp(1.35, 1.65, pressure);
+    laser.width = options.width ?? THREE.MathUtils.lerp(1.35, 1.65, pressure);
     laser.beam.scale.z = laser.width / 1.5;
     laser.core.scale.z = THREE.MathUtils.lerp(0.82, 1.0, pressure);
+    return true;
+  }
+
+  function spawnFixedEdgeLasers(count, pressure) {
+    const lines = getEdgeLaserLines();
+    shuffleArray(lines);
+    for (let i = 0; i < Math.min(count, lines.length); i += 1) {
+      spawnLaser(pressure, lines[i]);
+    }
+  }
+
+  function getEdgeLaserLines() {
+    const edge = roomHalf - EDGE_LASER_MARGIN;
+    const inner = edge - EDGE_LASER_INSET;
+    const lines = [];
+
+    [edge, inner].forEach((distance) => {
+      lines.push(
+        { angle: Math.PI / 2, position: { x: distance, z: 0 }, width: 1.75 },
+        { angle: Math.PI / 2, position: { x: -distance, z: 0 }, width: 1.75 },
+        { angle: 0, position: { x: 0, z: distance }, width: 1.75 },
+        { angle: 0, position: { x: 0, z: -distance }, width: 1.75 },
+      );
+    });
+
+    return lines;
+  }
+
+  function shuffleArray(items) {
+    for (let index = items.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(Math.random() * (index + 1));
+      [items[index], items[swapIndex]] = [items[swapIndex], items[index]];
+    }
+    return items;
   }
 
   function spawnCircle(pressure, options = {}) {
@@ -967,17 +1023,25 @@ export function createBadchildSurvivor({
 
   function isLaserPatternTime(songTime) {
     return (songTime >= PUZZLE_RAIN_END && songTime < LASER_ONLY_END)
-      || (songTime >= CIRCLE_ONLY_END && songTime < LASER_CIRCLE_END)
+      || isCircleLaserTime(songTime)
       || songTime >= LASER_CIRCLE_END;
+  }
+
+  function isPuzzlePatternTime(songTime) {
+    return songTime < PUZZLE_SPAWN_END || songTime >= LASER_CIRCLE_END;
   }
 
   function isCircleOnlyTime(songTime) {
     return songTime >= LASER_ONLY_END && songTime < CIRCLE_ONLY_END;
   }
 
+  function isCircleLaserTime(songTime) {
+    return songTime >= CIRCLE_ONLY_END && songTime < LASER_CIRCLE_END;
+  }
+
   function isCirclePatternTime(songTime) {
     return isCircleOnlyTime(songTime)
-      || (songTime >= CIRCLE_ONLY_END && songTime < LASER_CIRCLE_END)
+      || isCircleLaserTime(songTime)
       || songTime >= LASER_CIRCLE_END;
   }
 
