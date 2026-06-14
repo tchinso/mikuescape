@@ -357,6 +357,8 @@ button {
 
 .popup-panel {
   width: min(430px, 100%);
+  max-height: calc(100vh - 44px);
+  overflow: auto;
   border: 1px solid rgba(110, 231, 183, 0.36);
   border-radius: 8px;
   padding: 20px;
@@ -377,6 +379,8 @@ button {
   color: rgba(247, 250, 252, 0.78);
   font-size: 15px;
   line-height: 1.6;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
 }
 
 .popup-actions {

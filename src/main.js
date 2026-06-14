@@ -68,6 +68,37 @@ const RECRUIT_FLOORS = [FANART_FLOOR, GOTHIC_FLOOR, BADCHILD_FLOOR];
 const ROOFTOP_STAGE_NAME = "옥상 스테이지";
 const ROOFTOP_AUDIO_URL = new URL("../assets/rhythm/gunpowder-audio.mp3", import.meta.url).href;
 const ROOFTOP_CHART_URL = new URL("../assets/rhythm/gunpowder-chart.json", import.meta.url).href;
+const ENDING_AUDIO_URL = new URL("../assets/musics/ending.mp3", import.meta.url).href;
+const ENDING_CREDITS = [
+  "플레이해줘서 고마워요!",
+  "",
+  "제작자 : 냥캣",
+  "",
+  "3D 모델 - Sketchfab",
+  "https://sketchfab.com/",
+  "Open3DModel",
+  "https://open3dmodel.com/",
+  "",
+  "4층 BGM - お宝BGM",
+  "https://otakarabgm.booth.pm/items/8417343",
+  "3층 BGM - お宝BGM",
+  "https://otakarabgm.booth.pm/items/8323911",
+  "2층 BGM - おとぎ話の音楽絵本",
+  "https://dreamtalemelody.booth.pm/items/7063565",
+  "1층 BGM - NM Free Music",
+  "https://nmfreemusic.booth.pm/items/7484936",
+  "엔딩 - お宝BGM",
+  "https://otakarabgm.booth.pm/items/7032671",
+].join("\n");
+const COMPATIBILITY_WARNING_TITLE = "호환성 안내";
+const COMPATIBILITY_WARNING_BODY = [
+  "현재 환경에서는 호환성을 보장하지 않습니다.",
+  "",
+  "권장 환경",
+  "1. 데스크탑",
+  "2. 1920x1080 이상",
+  "3. 가로가 세로의 1.7배 이상",
+].join("\n");
 const RHYTHM_LANE_KEYS = ["Z", "X", "N", "M"];
 const RHYTHM_LANE_CODES = new Map([
   ["KeyZ", 0],
@@ -214,6 +245,8 @@ const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const clock = new THREE.Clock();
 const rhythmAudio = new Audio(ROOFTOP_AUDIO_URL);
 rhythmAudio.preload = "auto";
+const endingAudio = new Audio(ENDING_AUDIO_URL);
+endingAudio.preload = "auto";
 
 let player = null;
 let currentRecruit = null;
@@ -224,6 +257,7 @@ let loadedCount = 0;
 let messageTimeout = null;
 let popupPrimaryAction = null;
 let popupSecondaryAction = null;
+let startupCompatibilityChecked = false;
 let gunpowderChart = null;
 let rooftopChart = null;
 
@@ -329,11 +363,16 @@ async function init() {
   applyFloorTheme();
 
   if (developerShortcutFloor !== null) {
-    setupDeveloperShortcutFloor(developerShortcutFloor);
+    setupDeveloperShortcutFloor(developerShortcutFloor, { showIntro: false });
+    showStartupPopup(() => {
+      showDeveloperShortcutIntro(developerShortcutFloor);
+    });
   } else {
     updateHud();
-    showRooftopIntroPopup();
-    showMessage(ROOFTOP_STAGE_NAME);
+    showStartupPopup(() => {
+      showRooftopIntroPopup();
+      showMessage(ROOFTOP_STAGE_NAME);
+    });
   }
 
   dom.loading.classList.add("hidden");
@@ -353,6 +392,7 @@ function bindEvents() {
 
   window.addEventListener("keydown", (event) => {
     if (isPopupOpen()) {
+      handlePopupKeyDown(event);
       return;
     }
 
@@ -392,9 +432,7 @@ function bindEvents() {
   dom.skipButton.addEventListener("click", advanceDebugStep);
   dom.resetButton.addEventListener("click", resetPrototype);
   dom.popupPrimary.addEventListener("click", () => {
-    const action = popupPrimaryAction;
-    hidePopup();
-    action?.();
+    triggerPopupPrimary();
   });
   dom.popupSecondary.addEventListener("click", () => {
     const action = popupSecondaryAction;
@@ -1240,9 +1278,7 @@ function completeDoorTransition() {
   const leavingFloor = currentFloor;
 
   if (currentFloor <= 1) {
-    escapeComplete = true;
-    updateHud();
-    showMessage("탈출 완료", 2800);
+    completeEscape();
     return;
   }
 
@@ -1260,9 +1296,7 @@ function completeDoorTransition() {
 
   const nextFloor = getNextFloor(currentFloor);
   if (nextFloor === null) {
-    escapeComplete = true;
-    updateHud();
-    showMessage("탈출 완료", 2800);
+    completeEscape();
     return;
   }
 
@@ -1306,6 +1340,31 @@ function completeDoorTransition() {
         spawnRecruit();
       }
     }, 420);
+  }
+}
+
+function completeEscape() {
+  if (escapeComplete) {
+    return;
+  }
+
+  escapeComplete = true;
+  updateHud();
+  playEndingAudio();
+  showPopup("탈출 성공", ENDING_CREDITS, "확인");
+}
+
+async function playEndingAudio() {
+  try {
+    endingAudio.currentTime = 0;
+  } catch {
+    // Metadata may not be ready yet.
+  }
+
+  try {
+    await endingAudio.play();
+  } catch (error) {
+    console.warn("Ending audio playback was blocked.", error);
   }
 }
 
@@ -1407,6 +1466,83 @@ function isPopupOpen() {
   return !dom.popup.classList.contains("hidden");
 }
 
+function showStartupPopup(nextAction) {
+  if (startupCompatibilityChecked || isCompatibleStartupEnvironment()) {
+    startupCompatibilityChecked = true;
+    nextAction();
+    return;
+  }
+
+  startupCompatibilityChecked = true;
+  showPopup(COMPATIBILITY_WARNING_TITLE, getCompatibilityWarningBody(), "확인", nextAction);
+}
+
+function isCompatibleStartupEnvironment() {
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  return isNonMobileDevice()
+    && width >= 1920
+    && height >= 1080
+    && width / Math.max(height, 1) >= 1.7;
+}
+
+function isNonMobileDevice() {
+  if (navigator.userAgentData && typeof navigator.userAgentData.mobile === "boolean") {
+    return !navigator.userAgentData.mobile;
+  }
+
+  return !/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+function getCompatibilityWarningBody() {
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  const ratio = width / Math.max(height, 1);
+  const missing = [];
+
+  if (!isNonMobileDevice()) {
+    missing.push("모바일 환경");
+  }
+  if (width < 1920 || height < 1080) {
+    missing.push(`현재 해상도 ${width}x${height}`);
+  }
+  if (ratio < 1.7) {
+    missing.push(`현재 화면 비율 ${ratio.toFixed(2)}:1`);
+  }
+
+  return `${COMPATIBILITY_WARNING_BODY}\n\n미충족 항목\n${missing.map((item) => `- ${item}`).join("\n")}`;
+}
+
+function triggerPopupPrimary() {
+  const action = popupPrimaryAction;
+  hidePopup();
+  action?.();
+}
+
+function handlePopupKeyDown(event) {
+  if (!popupPrimaryAction || !isRestartKeyForCurrentFloor(event)) {
+    return;
+  }
+
+  event.preventDefault();
+  if (event.repeat) {
+    return;
+  }
+
+  triggerPopupPrimary();
+}
+
+function isRestartKeyForCurrentFloor(event) {
+  const key = event.key.toLowerCase();
+  if (currentFloor === ROOFTOP_FLOOR || currentFloor === GOTHIC_FLOOR) {
+    return event.code === "KeyZ" || key === "z";
+  }
+  if (currentFloor === FANART_FLOOR || currentFloor === BADCHILD_FLOOR) {
+    return event.code === "KeyE" || key === "e";
+  }
+  return false;
+}
+
 function isValidFloor(floor) {
   return FLOOR_ORDER.includes(floor);
 }
@@ -1485,7 +1621,8 @@ function isDeveloperCookieEnabled() {
     .some((cookie) => cookie === "developer=true");
 }
 
-function setupDeveloperShortcutFloor(floor) {
+function setupDeveloperShortcutFloor(floor, options = {}) {
+  const showIntro = options.showIntro ?? true;
   currentRecruit = null;
   exitOpen = false;
 
@@ -1516,25 +1653,52 @@ function setupDeveloperShortcutFloor(floor) {
   updateHud();
 
   if (floor === ROOFTOP_FLOOR) {
-    showRooftopIntroPopup();
-    showMessage(`${ROOFTOP_STAGE_NAME} 개발자 테스트`);
+    if (showIntro) {
+      showDeveloperShortcutIntro(floor);
+    }
     return;
   }
 
   spawnRecruit();
 
   if (floor === FANART_FLOOR) {
-    fanartGame.showIntroPopup();
+    if (showIntro) {
+      fanartGame.showIntroPopup();
+    }
   }
 
   if (floor === GOTHIC_FLOOR) {
     gothicGame.reset({ placePlayer: true });
     gothicGame.arrangeActors();
-    gothicGame.showIntroPopup();
+    if (showIntro) {
+      gothicGame.showIntroPopup();
+    }
   }
 
   if (floor === BADCHILD_FLOOR) {
     badchildGame.reset({ placePlayer: true });
+    if (showIntro) {
+      badchildGame.showIntroPopup();
+    }
+  }
+
+  if (showIntro) {
+    showMessage(`${floor}F 개발자 테스트`);
+  }
+}
+
+function showDeveloperShortcutIntro(floor) {
+  if (floor === ROOFTOP_FLOOR) {
+    showRooftopIntroPopup();
+    showMessage(`${ROOFTOP_STAGE_NAME} 개발자 테스트`);
+    return;
+  }
+
+  if (floor === FANART_FLOOR) {
+    fanartGame.showIntroPopup();
+  } else if (floor === GOTHIC_FLOOR) {
+    gothicGame.showIntroPopup();
+  } else if (floor === BADCHILD_FLOOR) {
     badchildGame.showIntroPopup();
   }
 
@@ -2014,6 +2178,12 @@ function resetPrototype() {
   pointerTargetActive.value = false;
   exitOpen = false;
   escapeComplete = false;
+  endingAudio.pause();
+  try {
+    endingAudio.currentTime = 0;
+  } catch {
+    // Metadata may not be ready yet.
+  }
   currentFloor = developerShortcutFloor ?? ROOFTOP_FLOOR;
 
   actors.splice(0).forEach((actor) => {
