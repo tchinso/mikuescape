@@ -559,7 +559,7 @@ export function createGothicMemory({
       return;
     }
 
-    state.roundIndex = Math.max(0, state.roundIndex - 3);
+    state.roundIndex = Math.max(0, state.roundIndex - 1);
     state.status = "retrying";
     state.sequence = [];
     state.inputIndex = 0;
